@@ -69,20 +69,45 @@ export const usePotStore = create<PotState>((set, get) => ({
         return;
       }
       
-      const potPromises = potIds.map((id: bigint) =>
-        _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
-          functionArguments: [id]
-        })
-      );
+      // Limit to first 20 pots to avoid rate limiting
+      const limitedPotIds = potIds.slice(0, 20);
+      console.log(`Fetching ${limitedPotIds.length} pots (limited from ${potIds.length} total)`);
       
-      const onChainPots = await Promise.all(potPromises);
-      const transformedPots = onChainPots.map(([pot]) => transformToPot(pot));
+      // Fetch pots with delay between requests to avoid rate limiting
+      const transformedPots = [];
+      for (let i = 0; i < limitedPotIds.length; i++) {
+        try {
+          const [pot] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
+            functionArguments: [limitedPotIds[i]]
+          });
+          transformedPots.push(transformToPot(pot));
+          
+          // Add small delay between requests to avoid rate limiting
+          if (i < limitedPotIds.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        } catch (potError) {
+          console.warn(`Failed to fetch pot ${limitedPotIds[i]}:`, potError);
+          // Continue with other pots even if one fails
+        }
+      }
       
       set({ pots: transformedPots, loading: false });
     } catch (error) {
       console.error("Failed to fetch pots:", error);
+      let errorMessage = "Failed to fetch pots from the blockchain.";
+      
+      // Check for specific error types
+      if (error instanceof AptosApiError) {
+        if (error.status === 429) {
+          errorMessage = "Rate limit exceeded. Please try again in a moment.";
+        } else if (error.status >= 500) {
+          errorMessage = "Blockchain service temporarily unavailable. Please try again later.";
+        }
+      }
+      
       set({ 
-        error: "Failed to fetch pots from the blockchain.", 
+        error: errorMessage, 
         loading: false,
         pots: [] // Clear pots on error
       });

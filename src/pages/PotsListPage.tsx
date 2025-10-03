@@ -18,7 +18,24 @@ export function PotsListPage() {
         <h1 className="text-4xl md:text-5xl font-display font-bold">Money Pots</h1>
         <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">Browse all available treasure hunts. May the sharpest mind win.</p>
       </div>
-      {error && <div className="text-center text-red-500">{error}</div>}
+      {error && (
+        <div className="text-center mb-8">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
+            <p className="text-sm text-red-500 dark:text-red-500 mt-2">
+              Showing up to 20 most recent pots to avoid rate limits.
+            </p>
+            <Button 
+              onClick={() => fetchPots()} 
+              variant="outline" 
+              size="sm" 
+              className="mt-3"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      )}
       {!loading && !error && pots.length === 0 && (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🏺</div>
@@ -29,6 +46,18 @@ export function PotsListPage() {
           <Button asChild size="lg">
             <Link to="/create">Create Your First Pot</Link>
           </Button>
+        </div>
+      )}
+      {loading && (
+        <div className="text-center mb-8">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <p className="text-blue-600 dark:text-blue-400 font-medium">
+              Fetching pots from blockchain...
+            </p>
+            <p className="text-sm text-blue-500 dark:text-blue-500 mt-2">
+              This may take a moment to avoid rate limits.
+            </p>
+          </div>
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
