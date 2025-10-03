@@ -23,7 +23,10 @@
 			],
             "@shared/*": [
                 "./shared/*"
-            ]
+            ],
+						"@abis/*": [
+							"./src/abis/*"
+						]
 		},
         "skipLibCheck": true
 	}

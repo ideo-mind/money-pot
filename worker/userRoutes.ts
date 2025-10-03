@@ -5,6 +5,20 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     // Add more routes like this. **DO NOT MODIFY CORS OR OVERRIDE ERROR HANDLERS**
     app.get('/api/test', (c) => c.json({ success: true, data: { name: 'this works' }}));
 
+    // Environment configuration endpoint
+    app.get('/api/config', (c) => {
+        return c.json({
+            success: true,
+            data: {
+                aptos_node_url: c.env.APTOS_NODE_URL || 'https://fullnode.testnet.aptoslabs.com/v1',
+                money_pot_contract_address: c.env.MONEY_POT_CONTRACT_ADDRESS || '0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f',
+                verifier_service_url: c.env.VERIFIER_SERVICE_URL || 'http://localhost:8787',
+                usdc_token_address: c.env.USDC_TOKEN_ADDRESS || '0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17da',
+                node_env: c.env.NODE_ENV || 'development'
+            }
+        });
+    });
+
     // Verifier Service Routes for 1P Authentication
     app.post('/register/options', async (c) => {
         try {

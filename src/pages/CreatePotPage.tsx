@@ -11,7 +11,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Account, U64 } from "@aptos-labs/ts-sdk";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { registerPot } from "@/lib/api";
-import * as money_pot_manager from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
+import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from "@/abis";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CopyableInput } from "@/components/CopyableInput";
@@ -109,20 +109,20 @@ export function CreatePotPage() {
       const entryFeeInOctas = BigInt(Math.floor(entryFee * 1_000_000));
       const durationInSeconds = BigInt(duration * 24 * 60 * 60);
       
-      // Use the generated ABI functions
-      const response = await money_pot_manager.entry.createPotEntry(
-        aptos,
-        account,
-        {
+      // Use wallet adapter to sign and submit transaction
+      const response = await signAndSubmitTransaction({
+        sender: account.address,
+        data: {
+          function: `${MODULE_ADDRESS}::${MODULE_NAME}::create_pot_entry`,
           typeArguments: [],
           functionArguments: [
-            amountInOctas,
-            durationInSeconds,
-            entryFeeInOctas,
+            amountInOctas.toString(),
+            durationInSeconds.toString(),
+            entryFeeInOctas.toString(),
             oneFaAddress,
           ],
-        }
-      );
+        },
+      });
       
       // Wait for transaction to complete
       const result = await aptos.waitForTransaction({
@@ -130,7 +130,7 @@ export function CreatePotPage() {
       });
       
       // Extract pot_id from events
-      const potCreatedEvent = result.events.find((e: any) => 
+      const potCreatedEvent = (result as any).events?.find((e: any) => 
         e.type.includes("PotCreatedEvent") || e.type.includes("created")
       );
       
@@ -154,7 +154,7 @@ export function CreatePotPage() {
       });
       
       // Fetch the created pot from blockchain
-      const [potData] = await money_pot_manager.view.getPot(aptos, {
+      const [potData] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
         functionArguments: [BigInt(potId)]
       });
       

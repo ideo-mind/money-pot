@@ -4,7 +4,7 @@ import { aptos, MODULE_ADDRESS, MODULE_NAME } from '@/lib/aptos';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { AptosApiError } from '@aptos-labs/ts-sdk';
 import { initialMockPots } from '@/lib/mock-data';
-import * as money_pot_manager from '@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f';
+import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from '@/abis';
 const ATTEMPTS_STORAGE_KEY = 'money-pot-attempts';
 interface PotState {
   pots: Pot[];
@@ -66,7 +66,7 @@ export const usePotStore = create<PotState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       // Use the generated ABI functions
-      const [potIds] = await money_pot_manager.view.getPots(aptos);
+      const [potIds] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPots(aptos);
       
       if (potIds.length === 0) {
         set({ loading: false }); // Stop loading but keep mock data
@@ -74,8 +74,8 @@ export const usePotStore = create<PotState>((set, get) => ({
       }
       
       const potPromises = potIds.map((id: bigint) =>
-        money_pot_manager.view.getPot(aptos, {
-          functionArguments: [id]
+        _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
+          functionArguments: [id.toString()]
         })
       );
       
@@ -104,8 +104,8 @@ export const usePotStore = create<PotState>((set, get) => ({
     set({ loading: true, error: null, currentPot: null });
     try {
       // Use the generated ABI functions
-      const [onChainPot] = await money_pot_manager.view.getPot(aptos, {
-        functionArguments: [BigInt(id)]
+      const [onChainPot] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
+        functionArguments: [BigInt(id).toString()]
       });
       
       const transformedPot = transformToPot(onChainPot);

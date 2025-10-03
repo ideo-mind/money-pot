@@ -8,7 +8,7 @@ import { Toaster, toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { getAuthOptions, verifyAuth } from "@/lib/api";
-import * as money_pot_manager from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
+import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from "@/abis";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,15 +70,15 @@ export function PotChallengePage() {
     setGameState("paying");
     const toastId = toast.loading("Submitting entry fee transaction...");
     try {
-      // Use the generated ABI functions
-      const response = await money_pot_manager.entry.attemptPotEntry(
-        aptos,
-        account!,
-        {
+      // Use wallet adapter to sign and submit transaction
+      const response = await signAndSubmitTransaction({
+        sender: account!.address,
+        data: {
+          function: `${MODULE_ADDRESS}::${MODULE_NAME}::attempt_pot_entry`,
           typeArguments: [],
-          functionArguments: [BigInt(pot.id)],
-        }
-      );
+          functionArguments: [BigInt(pot.id).toString()],
+        },
+      });
       
       // Wait for transaction to complete
       const result = await aptos.waitForTransaction({
@@ -135,14 +135,14 @@ export function PotChallengePage() {
         const { success } = await verifyAuth(pot!.id, newSolutions);
         
         // Update blockchain with result
-        await money_pot_manager.entry.attemptCompleted(
-          aptos,
-          account!,
-          {
+        await signAndSubmitTransaction({
+          sender: account!.address,
+          data: {
+            function: `${MODULE_ADDRESS}::${MODULE_NAME}::attempt_completed`,
             typeArguments: [],
-            functionArguments: [BigInt(pot!.id), success],
-          }
-        );
+            functionArguments: [BigInt(pot!.id).toString(), success],
+          },
+        });
         
         addAttempt({ potId: pot!.id, potTitle: pot!.title, status: success ? 'won' : 'lost', date: new Date().toISOString() });
         

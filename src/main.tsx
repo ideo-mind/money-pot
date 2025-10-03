@@ -6,10 +6,10 @@ import {
   createBrowserRouter,
   RouterProvider,
 } from "react-router-dom";
-import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { RouteErrorBoundary } from '@/components/RouteErrorBoundary';
-import '@/index.css'
-import { HomePage } from '@/pages/HomePage'
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { RouteErrorBoundary } from './components/RouteErrorBoundary';
+import './index.css'
+import { HomePage } from './pages/HomePage'
 import { AptosWalletProvider } from "./components/AptosWalletProvider";
 import { Layout } from "./components/Layout";
 import { CreatePotPage } from "./pages/CreatePotPage";

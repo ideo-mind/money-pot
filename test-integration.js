@@ -5,14 +5,26 @@
  * Tests the Cloudflare Worker endpoints
  */
 
-const BASE_URL = 'http://localhost:8787';
+// Load environment variables
+require('dotenv').config({ path: './development.env' });
+
+const BASE_URL = process.env.VITE_VERIFIER_SERVICE_URL || 'http://localhost:8787';
+const CONTRACT_ADDRESS = process.env.VITE_MONEY_POT_CONTRACT_ADDRESS || '0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f';
 
 async function testVerifierService() {
   console.log('🧪 Testing Money Pot Verifier Service Integration...\n');
+  console.log(`📍 Using BASE_URL: ${BASE_URL}`);
+  console.log(`📍 Using CONTRACT_ADDRESS: ${CONTRACT_ADDRESS}\n`);
 
   try {
+    // Test 0: Configuration endpoint
+    console.log('0. Testing configuration endpoint...');
+    const configResponse = await fetch(`${BASE_URL}/api/config`);
+    const configData = await configResponse.json();
+    console.log('✅ Configuration:', configData);
+
     // Test 1: Health check
-    console.log('1. Testing health endpoint...');
+    console.log('\n1. Testing health endpoint...');
     const healthResponse = await fetch(`${BASE_URL}/api/health`);
     const healthData = await healthResponse.json();
     console.log('✅ Health check:', healthData);

@@ -1,7 +1,9 @@
 // Real API for interacting with the off-chain verifier service.
 // This makes HTTPS requests to the Cloudflare Worker verifier service.
 
-const VERIFIER_BASE_URL = '/api'; // Use relative URL for same-origin requests
+import { ENV_CONFIG } from './aptos';
+
+const VERIFIER_BASE_URL = ENV_CONFIG.VERIFIER_SERVICE_URL + ENV_CONFIG.VERIFIER_SERVICE_BASE_URL;
 
 export interface RegisterPayload {
   potId: string;
