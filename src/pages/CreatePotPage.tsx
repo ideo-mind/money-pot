@@ -33,7 +33,7 @@ export function CreatePotPage() {
   const addPot = usePotStore((state) => state.addPot);
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
-  const [amount, setAmount] = useState(0.001);
+  const [amount, setAmount] = useState(0.01);
   const [duration, setDuration] = useState(1);
   const [entryFee, setEntryFee] = useState(0.01);
   const [oneFaAddress, setOneFaAddress] = useState('');

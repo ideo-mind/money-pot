@@ -45,7 +45,7 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
     };
     
     // For MVP: send as hex-encoded JSON (no encryption)
-    const encryptedPayload = Buffer.from(JSON.stringify(payloadData)).toString('hex');
+    const encryptedPayload = btoa(JSON.stringify(payloadData));
     
     // Step 3: Register with verifier
     const registerResponse = await fetch(`${VERIFIER_BASE_URL}/register/verify`, {
