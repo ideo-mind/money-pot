@@ -6,17 +6,32 @@ import { AptosApiError } from '@aptos-labs/ts-sdk';
 // Removed import of initialMockPots - starting with empty array
 import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from '@/abis';
 const ATTEMPTS_STORAGE_KEY = 'money-pot-attempts';
+const POTS_STORAGE_KEY = 'money-pot-pots';
+const POTS_METADATA_KEY = 'money-pot-metadata';
+
+interface PotMetadata {
+  lastFetch: number;
+  totalPots: number;
+  fetchedPots: number;
+  allPotIds: string[];
+}
+
 interface PotState {
   pots: Pot[];
   currentPot: Pot | null;
   attempts: Attempt[];
   loading: boolean;
   error: string | null;
+  hasMorePots: boolean;
+  currentBatch: number;
+  totalPots: number;
   fetchPots: () => Promise<void>;
+  fetchNextBatch: () => Promise<void>;
   fetchPotById: (id: string) => Promise<void>;
   getPotById: (id: string) => Pot | undefined;
   addAttempt: (attempt: Attempt) => void;
   addPot: (pot: Pot) => void;
+  clearCache: () => void;
 }
 // Removed POT_TITLES array - using Pot #ID format instead
 export const transformToPot = (onChainPot: any): Pot => {
@@ -52,52 +67,107 @@ const loadAttemptsFromStorage = (): Attempt[] => {
     return [];
   }
 };
+
+const loadPotsFromStorage = (): Pot[] => {
+  try {
+    const storedPots = localStorage.getItem(POTS_STORAGE_KEY);
+    return storedPots ? JSON.parse(storedPots) : [];
+  } catch (error) {
+    console.error("Failed to load pots from local storage:", error);
+    return [];
+  }
+};
+
+const loadMetadataFromStorage = (): PotMetadata | null => {
+  try {
+    const storedMetadata = localStorage.getItem(POTS_METADATA_KEY);
+    return storedMetadata ? JSON.parse(storedMetadata) : null;
+  } catch (error) {
+    console.error("Failed to load metadata from local storage:", error);
+    return null;
+  }
+};
+
+const savePotsToStorage = (pots: Pot[]) => {
+  try {
+    localStorage.setItem(POTS_STORAGE_KEY, JSON.stringify(pots));
+  } catch (error) {
+    console.error("Failed to save pots to local storage:", error);
+  }
+};
+
+const saveMetadataToStorage = (metadata: PotMetadata) => {
+  try {
+    localStorage.setItem(POTS_METADATA_KEY, JSON.stringify(metadata));
+  } catch (error) {
+    console.error("Failed to save metadata to local storage:", error);
+  }
+};
 export const usePotStore = create<PotState>((set, get) => ({
-  pots: [], // Start with empty array - no mock pots
+  pots: loadPotsFromStorage(), // Load cached pots
   currentPot: null,
   attempts: loadAttemptsFromStorage(),
   loading: false,
   error: null,
+  hasMorePots: true,
+  currentBatch: 0,
+  totalPots: 0,
   fetchPots: async () => {
+    const state = get();
+    const metadata = loadMetadataFromStorage();
+    const now = Date.now();
+    
+    // Check if we have cached data and it's recent (less than 5 minutes old)
+    if (metadata && state.pots.length > 0 && (now - metadata.lastFetch) < 5 * 60 * 1000) {
+      console.log("Using cached pots data");
+      set({ 
+        totalPots: metadata.totalPots,
+        hasMorePots: metadata.fetchedPots < metadata.totalPots,
+        currentBatch: Math.floor(metadata.fetchedPots / 10)
+      });
+      return;
+    }
+    
     set({ loading: true, error: null });
     try {
-      // Use the generated ABI functions
+      // Get all pot IDs first
       const [potIds] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPots(aptos);
       
       if (potIds.length === 0) {
-        set({ pots: [], loading: false }); // No pots found, show empty state
+        set({ pots: [], loading: false, totalPots: 0, hasMorePots: false });
+        savePotsToStorage([]);
+        saveMetadataToStorage({
+          lastFetch: now,
+          totalPots: 0,
+          fetchedPots: 0,
+          allPotIds: []
+        });
         return;
       }
       
-      // Limit to first 20 pots to avoid rate limiting
-      const limitedPotIds = potIds.slice(0, 20);
-      console.log(`Fetching ${limitedPotIds.length} pots (limited from ${potIds.length} total)`);
+      // Save metadata with all pot IDs
+      const newMetadata: PotMetadata = {
+        lastFetch: now,
+        totalPots: potIds.length,
+        fetchedPots: 0,
+        allPotIds: potIds.map(id => id.toString())
+      };
+      saveMetadataToStorage(newMetadata);
       
-      // Fetch pots with delay between requests to avoid rate limiting
-      const transformedPots = [];
-      for (let i = 0; i < limitedPotIds.length; i++) {
-        try {
-          const [pot] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
-            functionArguments: [limitedPotIds[i]]
-          });
-          transformedPots.push(transformToPot(pot));
-          
-          // Add small delay between requests to avoid rate limiting
-          if (i < limitedPotIds.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        } catch (potError) {
-          console.warn(`Failed to fetch pot ${limitedPotIds[i]}:`, potError);
-          // Continue with other pots even if one fails
-        }
-      }
+      set({ 
+        totalPots: potIds.length,
+        hasMorePots: potIds.length > 0,
+        currentBatch: 0,
+        loading: false
+      });
       
-      set({ pots: transformedPots, loading: false });
+      // Start fetching first batch
+      await get().fetchNextBatch();
+      
     } catch (error) {
-      console.error("Failed to fetch pots:", error);
+      console.error("Failed to fetch pot IDs:", error);
       let errorMessage = "Failed to fetch pots from the blockchain.";
       
-      // Check for specific error types
       if (error instanceof AptosApiError) {
         if (error.status === 429) {
           errorMessage = "Rate limit exceeded. Please try again in a moment.";
@@ -109,8 +179,74 @@ export const usePotStore = create<PotState>((set, get) => ({
       set({ 
         error: errorMessage, 
         loading: false,
-        pots: [] // Clear pots on error
+        pots: state.pots // Keep existing cached pots on error
       });
+    }
+  },
+  fetchNextBatch: async () => {
+    const state = get();
+    const metadata = loadMetadataFromStorage();
+    
+    if (!metadata || !state.hasMorePots) {
+      return;
+    }
+    
+    const batchSize = 10;
+    const startIndex = state.currentBatch * batchSize;
+    const endIndex = Math.min(startIndex + batchSize, metadata.allPotIds.length);
+    const potIdsToFetch = metadata.allPotIds.slice(startIndex, endIndex);
+    
+    if (potIdsToFetch.length === 0) {
+      set({ hasMorePots: false });
+      return;
+    }
+    
+    console.log(`Fetching batch ${state.currentBatch + 1}: pots ${startIndex + 1}-${endIndex} of ${metadata.totalPots}`);
+    
+    const newPots: Pot[] = [];
+    
+    // Fetch pots one by one with delays
+    for (let i = 0; i < potIdsToFetch.length; i++) {
+      try {
+        const [pot] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
+          functionArguments: [BigInt(potIdsToFetch[i])]
+        });
+        newPots.push(transformToPot(pot));
+        
+        // Add delay between requests
+        if (i < potIdsToFetch.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      } catch (potError) {
+        console.warn(`Failed to fetch pot ${potIdsToFetch[i]}:`, potError);
+      }
+    }
+    
+    // Update state with new pots
+    const updatedPots = [...state.pots, ...newPots];
+    const newFetchedCount = metadata.fetchedPots + newPots.length;
+    const hasMore = newFetchedCount < metadata.totalPots;
+    
+    set({
+      pots: updatedPots,
+      currentBatch: state.currentBatch + 1,
+      hasMorePots: hasMore
+    });
+    
+    // Update metadata
+    const updatedMetadata: PotMetadata = {
+      ...metadata,
+      fetchedPots: newFetchedCount
+    };
+    saveMetadataToStorage(updatedMetadata);
+    savePotsToStorage(updatedPots);
+    
+    // Schedule next batch if there are more pots
+    if (hasMore) {
+      console.log(`Scheduling next batch in 100 seconds...`);
+      setTimeout(() => {
+        get().fetchNextBatch();
+      }, 100000); // 100 seconds
     }
   },
   fetchPotById: async (id: string) => {
@@ -153,9 +289,21 @@ export const usePotStore = create<PotState>((set, get) => ({
     });
   },
   addPot: (pot: Pot) => {
-    // TODO: In a real-world scenario with a backend, we would re-fetch the list
-    // or receive a pushed update. For this frontend-driven approach,
-    // prepending the new pot provides instant and optimistic UI feedback.
-    set((state) => ({ pots: [pot, ...state.pots] }));
+    // Add pot to state and cache
+    set((state) => {
+      const newPots = [pot, ...state.pots];
+      savePotsToStorage(newPots);
+      return { pots: newPots };
+    });
+  },
+  clearCache: () => {
+    localStorage.removeItem(POTS_STORAGE_KEY);
+    localStorage.removeItem(POTS_METADATA_KEY);
+    set({ 
+      pots: [], 
+      hasMorePots: true, 
+      currentBatch: 0, 
+      totalPots: 0 
+    });
   },
 }));

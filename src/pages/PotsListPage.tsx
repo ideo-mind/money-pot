@@ -8,7 +8,12 @@ export function PotsListPage() {
   const pots = usePotStore((state) => state.pots);
   const loading = usePotStore((state) => state.loading);
   const error = usePotStore((state) => state.error);
+  const hasMorePots = usePotStore((state) => state.hasMorePots);
+  const currentBatch = usePotStore((state) => state.currentBatch);
+  const totalPots = usePotStore((state) => state.totalPots);
   const fetchPots = usePotStore((state) => state.fetchPots);
+  const fetchNextBatch = usePotStore((state) => state.fetchNextBatch);
+  const clearCache = usePotStore((state) => state.clearCache);
   useEffect(() => {
     fetchPots();
   }, [fetchPots]);
@@ -52,11 +57,43 @@ export function PotsListPage() {
         <div className="text-center mb-8">
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-blue-600 dark:text-blue-400 font-medium">
-              Fetching pots from blockchain...
+              Fetching pot IDs from blockchain...
             </p>
             <p className="text-sm text-blue-500 dark:text-blue-500 mt-2">
-              This may take a moment to avoid rate limits.
+              This will start slow batch loading to avoid rate limits.
             </p>
+          </div>
+        </div>
+      )}
+      
+      {!loading && totalPots > 0 && (
+        <div className="text-center mb-8">
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <p className="text-green-600 dark:text-green-400 font-medium">
+              Loading pots in batches of 10 every 100 seconds
+            </p>
+            <p className="text-sm text-green-500 dark:text-green-500 mt-2">
+              Showing {pots.length} of {totalPots} pots
+              {hasMorePots && ` • Next batch in ${Math.max(0, 100 - ((Date.now() - (currentBatch * 100000)) / 1000))}s`}
+            </p>
+            <div className="mt-3 space-x-2">
+              {hasMorePots && (
+                <Button 
+                  onClick={() => fetchNextBatch()} 
+                  variant="outline" 
+                  size="sm"
+                >
+                  Load Next Batch Now
+                </Button>
+              )}
+              <Button 
+                onClick={() => clearCache()} 
+                variant="outline" 
+                size="sm"
+              >
+                Clear Cache
+              </Button>
+            </div>
           </div>
         </div>
       )}
