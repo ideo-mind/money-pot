@@ -1,1 +1,0 @@
-/Volumes/N/1p/money-auth/src/abis/index.ts
