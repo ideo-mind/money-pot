@@ -1,19 +1,22 @@
-# Wrangler config for the Cloudflare Durable Object template
-# STRICTLY DO NOT MODIFY THIS FILE - Hidden from AI to prevent breaking core functionality
-
+# Money Pot - Cloudflare Pages Configuration
 name = "money-pot"
 main = "worker/index.ts"
 compatibility_date = "2025-04-24"
 
 [assets]
+directory = "dist"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*", "!/api/docs/*"]
+run_worker_first = ["/api/*"]
 
 [observability]
 enabled = true
 
-# KV storage for verifier service
+# KV storage for 1P authentication service
 [[kv_namespaces]]
 binding = "KV"
 id = "money-pot-kv"
 preview_id = "money-pot-kv-preview"
+
+# Environment variables for production
+[vars]
+NODE_ENV = "production"

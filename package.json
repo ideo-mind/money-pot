@@ -4,12 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port ${PORT:-3000}",
+    "dev": "vite",
     "build": "vite build",
-    "lint": "eslint --cache -f json --quiet .",
-    "preview": "bun run build && vite preview --host 0.0.0.0 --port ${PORT:-4173}",
-    "deploy": "wrangler deploy --minify",
-    "cf-typegen": "wrangler types"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "deploy": "wrangler deploy",
+    "cf-typegen": "wrangler types",
+    "pages:build": "vite build",
+    "pages:dev": "wrangler pages dev dist --compatibility-date=2025-04-24"
   },
   "dependencies": {
     "@aptos-labs/ts-sdk": "^5.1.0",
@@ -99,6 +101,8 @@
     "@cloudflare/vite-plugin": "^1.9.4",
     "@cloudflare/workers-types": "^4.20250424.0",
     "@eslint/js": "^9.22.0",
+    "@typemove/aptos": "^1.13.3",
+    "@typemove/move": "^1.13.3",
     "@types/node": "^22.15.3",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
