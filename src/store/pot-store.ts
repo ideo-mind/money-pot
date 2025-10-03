@@ -75,8 +75,18 @@ export const transformToPot = (onChainPot: any): Pot => {
     : formatDistanceToNowStrict(expiresAt, { addSuffix: true });
   const difficulty = Math.min(Number(onChainPot.attempts_count) % 11 + 2, Number(onChainPot.attempts_count) + 2);
   return {
-    ...onChainPot,
+    // Convert all BigInt values to strings
     id: onChainPot.id.toString(),
+    creator: onChainPot.creator.toString(),
+    total_usdc: onChainPot.total_amount.toString(),
+    entry_fee: onChainPot.fee.toString(),
+    created_at: onChainPot.created_at.toString(),
+    expires_at: onChainPot.expires_at.toString(),
+    is_active: onChainPot.is_active,
+    attempts_count: onChainPot.attempts_count.toString(),
+    one_fa_address: onChainPot.one_fa_address.toString(),
+    one_fa_private_key: onChainPot.one_fa_private_key?.toString(),
+    // UI-specific, transformed fields
     title: `Pot #${onChainPot.id}`,
     totalValue,
     entryFee,
@@ -118,9 +128,24 @@ const loadMetadataFromStorage = (): PotMetadata | null => {
   }
 };
 
+const convertBigIntToString = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'bigint') return obj.toString();
+  if (Array.isArray(obj)) return obj.map(convertBigIntToString);
+  if (typeof obj === 'object') {
+    const converted: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      converted[key] = convertBigIntToString(value);
+    }
+    return converted;
+  }
+  return obj;
+};
+
 const savePotsToStorage = (pots: Pot[]) => {
   try {
-    localStorage.setItem(POTS_STORAGE_KEY, JSON.stringify(pots));
+    const serializablePots = convertBigIntToString(pots);
+    localStorage.setItem(POTS_STORAGE_KEY, JSON.stringify(serializablePots));
   } catch (error) {
     console.error("Failed to save pots to local storage:", error);
   }

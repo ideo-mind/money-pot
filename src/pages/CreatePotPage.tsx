@@ -4,7 +4,10 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Wand2, Loader2, Terminal, Eye, EyeOff, Shuffle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Wand2, Loader2, Terminal, Eye, EyeOff, Shuffle, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
@@ -35,6 +38,8 @@ export function CreatePotPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [amount, setAmount] = useState(0.01);
   const [duration, setDuration] = useState(1);
+  const [durationType, setDurationType] = useState<'days' | 'weeks' | 'months' | 'custom'>('days');
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [entryFee, setEntryFee] = useState(0.01);
   const [oneFaAddress, setOneFaAddress] = useState('');
   const [oneFaPrivateKey, setOneFaPrivateKey] = useState('');
@@ -53,10 +58,49 @@ export function CreatePotPage() {
   }, []);
   const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, steps.length));
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
+  const getDurationInSeconds = () => {
+    if (durationType === 'custom' && customEndDate) {
+      const now = new Date();
+      const diffMs = customEndDate.getTime() - now.getTime();
+      return Math.max(0, Math.floor(diffMs / 1000));
+    }
+    
+    switch (durationType) {
+      case 'days':
+        return duration * 24 * 60 * 60;
+      case 'weeks':
+        return duration * 7 * 24 * 60 * 60;
+      case 'months':
+        return duration * 30 * 24 * 60 * 60; // Approximate month as 30 days
+      default:
+        return duration * 24 * 60 * 60;
+    }
+  };
+
+  const getDurationDisplay = () => {
+    if (durationType === 'custom' && customEndDate) {
+      const now = new Date();
+      const diffMs = customEndDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      return `${diffDays} days (until ${customEndDate.toLocaleDateString()})`;
+    }
+    
+    switch (durationType) {
+      case 'days':
+        return `${duration} day${duration !== 1 ? 's' : ''}`;
+      case 'weeks':
+        return `${duration} week${duration !== 1 ? 's' : ''}`;
+      case 'months':
+        return `${duration} month${duration !== 1 ? 's' : ''}`;
+      default:
+        return `${duration} day${duration !== 1 ? 's' : ''}`;
+    }
+  };
+
   const getIsStepComplete = () => {
     switch (currentStep) {
       case 1:
-        return amount > 0 && duration > 0;
+        return amount > 0 && (durationType === 'custom' ? customEndDate && customEndDate > new Date() : duration > 0);
       case 2:
         return !!oneFaPrivateKey;
       case 3:
@@ -108,7 +152,7 @@ export function CreatePotPage() {
     try {
       const amountInOctas = BigInt(Math.floor(amount * 1_000_000));
       const entryFeeInOctas = BigInt(Math.floor(entryFee * 1_000_000));
-      const durationInSeconds = BigInt(duration * 24 * 60 * 60);
+      const durationInSeconds = BigInt(getDurationInSeconds());
       
       // Use wallet adapter to sign and submit transaction
       const response = await signAndSubmitTransaction({
@@ -246,9 +290,71 @@ export function CreatePotPage() {
                           <Label htmlFor="amount">Pot Amount (USDC)</Label>
                           <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="e.g., 1000" min="0.001" />
                         </div>
-                        <div className="space-y-2">
-                          <Label>Duration: {duration} days</Label>
-                          <Slider value={[duration]} onValueChange={(val) => setDuration(val[0])} min={1} max={10} step={1} />
+                        <div className="space-y-4">
+                          <Label>Duration</Label>
+                          <div className="space-y-3">
+                            <Select value={durationType} onValueChange={(value: 'days' | 'weeks' | 'months' | 'custom') => setDurationType(value)}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select duration type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="days">Days</SelectItem>
+                                <SelectItem value="weeks">Weeks</SelectItem>
+                                <SelectItem value="months">Months</SelectItem>
+                                <SelectItem value="custom">Custom End Date</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            
+                            {durationType === 'custom' ? (
+                              <div className="space-y-2">
+                                <Label>End Date</Label>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {customEndDate ? customEndDate.toLocaleDateString() : "Select end date"}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={customEndDate}
+                                      onSelect={setCustomEndDate}
+                                      disabled={(date) => date < new Date()}
+                                      initialFocus
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                                {customEndDate && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Pot will expire on {customEndDate.toLocaleDateString()} at {customEndDate.toLocaleTimeString()}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <Label>Number of {durationType}</Label>
+                                <Slider 
+                                  value={[duration]} 
+                                  onValueChange={(val) => setDuration(val[0])} 
+                                  min={1} 
+                                  max={durationType === 'days' ? 365 : durationType === 'weeks' ? 52 : 12} 
+                                  step={1} 
+                                />
+                                <p className="text-sm text-muted-foreground">
+                                  {duration} {durationType} ({getDurationDisplay()})
+                                </p>
+                              </div>
+                            )}
+                            
+                            <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Clock className="h-4 w-4" />
+                                <span className="font-medium">Total Duration:</span>
+                                <span>{getDurationDisplay()}</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </CardContent>
                     </div>
