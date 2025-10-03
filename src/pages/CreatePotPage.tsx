@@ -33,7 +33,7 @@ export function CreatePotPage() {
   const addPot = usePotStore((state) => state.addPot);
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
-  const [amount, setAmount] = useState(1);
+  const [amount, setAmount] = useState(0.001);
   const [duration, setDuration] = useState(1);
   const [entryFee, setEntryFee] = useState(0.01);
   const [oneFaAddress, setOneFaAddress] = useState('');
@@ -130,24 +130,51 @@ export function CreatePotPage() {
         transactionHash: response.hash,
       });
       
+      // Debug: Log all events to understand the structure
+      console.log("Transaction result:", result);
+      console.log("All events:", (result as any).events);
+      
+      let potId: string | undefined;
+      
       // Extract pot_id from events using proper PotEvent type
       const potCreatedEvent = (result as any).events?.find((e: any) => {
+        console.log("Checking event:", e);
         // Look for PotEvent with event_type containing "created"
         if (e.type.includes("PotEvent")) {
           const eventData = e.data as money_pot_manager.PotEvent;
+          console.log("PotEvent data:", eventData);
           return eventData.event_type.includes("created");
         }
         return false;
       });
       
-      if (!potCreatedEvent) {
-        throw new Error("Could not find PotCreatedEvent in transaction result.");
+      if (potCreatedEvent) {
+        const eventData = potCreatedEvent.data as money_pot_manager.PotEvent;
+        potId = eventData.id.toString();
+        console.log("Extracted pot_id from PotEvent:", potId);
+      } else {
+        // Fallback: try to find any event that might contain pot information
+        console.log("No PotEvent found, trying fallback...");
+        const fallbackEvent = (result as any).events?.find((e: any) => 
+          e.type.includes("money_pot") || e.type.includes("created") || e.type.includes("pot")
+        );
+        
+        if (fallbackEvent) {
+          console.log("Found fallback event:", fallbackEvent);
+          // Try to extract pot_id from various possible locations
+          potId = fallbackEvent.data?.pot_id?.toString() || fallbackEvent.data?.id?.toString() || fallbackEvent.data?.value?.toString();
+          if (potId) {
+            console.log("Extracted pot_id from fallback:", potId);
+          } else {
+            throw new Error(`Could not extract pot_id from fallback event: ${JSON.stringify(fallbackEvent)}`);
+          }
+        } else {
+          throw new Error(`Could not find any relevant event in transaction result. Available events: ${JSON.stringify((result as any).events)}`);
+        }
       }
       
-      const eventData = potCreatedEvent.data as money_pot_manager.PotEvent;
-      const potId = eventData.id;
       if (!potId) {
-        throw new Error("Could not extract pot_id from PotEvent data.");
+        throw new Error("Could not extract pot_id from any event.");
       }
       
       toast.loading("Registering pot with verifier...", { id: toastId });
@@ -217,7 +244,7 @@ export function CreatePotPage() {
                       <CardContent className="space-y-6">
                         <div className="space-y-2">
                           <Label htmlFor="amount">Pot Amount (USDC)</Label>
-                          <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="e.g., 1000" min="1" />
+                          <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="e.g., 1000" min="0.001" />
                         </div>
                         <div className="space-y-2">
                           <Label>Duration: {duration} days</Label>
