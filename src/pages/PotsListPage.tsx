@@ -21,7 +21,7 @@ export function PotsListPage() {
     <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-16">
         <h1 className="text-4xl md:text-5xl font-display font-bold">Money Pots</h1>
-        <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">Browse all available treasure hunts. May the sharpest mind win.</p>
+        <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">Browse all available treasure hunts, newest first. May the sharpest mind win.</p>
       </div>
       {error && (
         <div className="text-center mb-8">

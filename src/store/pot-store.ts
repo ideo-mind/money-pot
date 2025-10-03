@@ -149,7 +149,7 @@ export const usePotStore = create<PotState>((set, get) => ({
     
     // Check if we have cached data and it's recent (less than 5 minutes old)
     if (metadata && state.pots.length > 0 && (now - metadata.lastFetch) < 5 * 60 * 1000) {
-      console.log("Using cached pots data");
+      console.log("Using cached pots data (newest first)");
       set({ 
         totalPots: metadata.totalPots,
         hasMorePots: metadata.fetchedPots < metadata.totalPots,
@@ -175,12 +175,19 @@ export const usePotStore = create<PotState>((set, get) => ({
         return;
       }
       
-      // Save metadata with all pot IDs
+      // Sort pot IDs in descending order (newest first)
+      const sortedPotIds = potIds
+        .map(id => id.toString())
+        .sort((a, b) => parseInt(b) - parseInt(a)); // Sort by ID descending (newest first)
+      
+      console.log('Pot IDs sorted (newest first):', sortedPotIds.slice(0, 10), '...');
+      
+      // Save metadata with sorted pot IDs
       const newMetadata: PotMetadata = {
         lastFetch: now,
         totalPots: potIds.length,
         fetchedPots: 0,
-        allPotIds: potIds.map(id => id.toString())
+        allPotIds: sortedPotIds
       };
       saveMetadataToStorage(newMetadata);
       
@@ -231,7 +238,7 @@ export const usePotStore = create<PotState>((set, get) => ({
       return;
     }
     
-    console.log(`Fetching batch ${state.currentBatch + 1}: pots ${startIndex + 1}-${endIndex} of ${metadata.totalPots}`);
+    console.log(`Fetching batch ${state.currentBatch + 1}: newest pots ${startIndex + 1}-${endIndex} of ${metadata.totalPots}`);
     
     const newPots: Pot[] = [];
     
