@@ -11,3 +11,9 @@ run_worker_first = ["/api/*", "!/api/docs/*"]
 
 [observability]
 enabled = true
+
+# KV storage for verifier service
+[[kv_namespaces]]
+binding = "KV"
+id = "money-pot-kv"
+preview_id = "money-pot-kv-preview"

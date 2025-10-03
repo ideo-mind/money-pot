@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Loader2, PartyPopper, ShieldClose, SkipForward, CheckCircle2, XCircle, KeyRound } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
-import { MODULE_ADDRESS, MODULE_NAME } from "@/lib/aptos";
+import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { getAuthOptions, verifyAuth } from "@/lib/api";
+import * as money_pot_manager from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,17 +70,50 @@ export function PotChallengePage() {
     setGameState("paying");
     const toastId = toast.loading("Submitting entry fee transaction...");
     try {
-      const response = await signAndSubmitTransaction({
-        data: {
-          function: `${MODULE_ADDRESS}::${MODULE_NAME}::attempt_pot_entry`,
+      // Use the generated ABI functions
+      const response = await money_pot_manager.entry.attemptPotEntry(
+        aptos,
+        account!,
+        {
           typeArguments: [],
-          functionArguments: [pot.id],
+          functionArguments: [BigInt(pot.id)],
         }
+      );
+      
+      // Wait for transaction to complete
+      const result = await aptos.waitForTransaction({
+        transactionHash: response.hash,
       });
-      const attemptId = response.hash;
+      
+      // Extract attempt_id from events
+      const attemptEvent = result.events.find((e: any) => 
+        e.type.includes("AttemptEvent") || e.type.includes("attempt")
+      );
+      
+      if (!attemptEvent) {
+        throw new Error("Could not find AttemptEvent in transaction result.");
+      }
+      
+      const attemptId = attemptEvent.data.attempt_id || attemptEvent.data.id;
+      if (!attemptId) {
+        throw new Error("Could not extract attempt_id from event data.");
+      }
+      
       toast.success("Entry fee paid! Fetching challenge...", { id: toastId });
       setGameState("fetching_challenge");
-      const { challenges: fetchedChallenges } = await getAuthOptions(attemptId);
+      
+      // Store attempt in verifier service for challenge generation
+      await fetch('/api/attempt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attempt_id: attemptId.toString(),
+          pot_id: pot.id,
+          difficulty: pot.difficulty
+        })
+      });
+      
+      const { challenges: fetchedChallenges } = await getAuthOptions(attemptId.toString());
       setChallenges(fetchedChallenges.slice(0, pot.difficulty));
       setGameState("playing");
     } catch (error) {
@@ -95,13 +129,33 @@ export function PotChallengePage() {
     } else {
       setGameState("verifying");
       const toastId = toast.loading("Verifying your solution...");
-      const { success } = await verifyAuth(pot!.id, newSolutions);
-      addAttempt({ potId: pot!.id, potTitle: pot!.title, status: success ? 'won' : 'lost', date: new Date().toISOString() });
-      if (success) {
-        toast.success("Congratulations! You've won!", { id: toastId });
-        setGameState("won");
-      } else {
-        toast.error("Incorrect solution. Better luck next time!", { id: toastId });
+      
+      try {
+        // Verify with verifier service
+        const { success } = await verifyAuth(pot!.id, newSolutions);
+        
+        // Update blockchain with result
+        await money_pot_manager.entry.attemptCompleted(
+          aptos,
+          account!,
+          {
+            typeArguments: [],
+            functionArguments: [BigInt(pot!.id), success],
+          }
+        );
+        
+        addAttempt({ potId: pot!.id, potTitle: pot!.title, status: success ? 'won' : 'lost', date: new Date().toISOString() });
+        
+        if (success) {
+          toast.success("Congratulations! You've won!", { id: toastId });
+          setGameState("won");
+        } else {
+          toast.error("Incorrect solution. Better luck next time!", { id: toastId });
+          setGameState("lost");
+        }
+      } catch (error) {
+        console.error("Verification failed:", error);
+        toast.error("Verification failed.", { id: toastId, description: (error as Error).message });
         setGameState("lost");
       }
     }

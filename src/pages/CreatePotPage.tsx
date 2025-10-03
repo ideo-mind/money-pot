@@ -11,6 +11,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { Account, U64 } from "@aptos-labs/ts-sdk";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { registerPot } from "@/lib/api";
+import * as money_pot_manager from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CopyableInput } from "@/components/CopyableInput";
@@ -104,34 +105,62 @@ export function CreatePotPage() {
     setIsSubmitting(true);
     const toastId = toast.loading("Submitting transaction to Aptos...");
     try {
-      const amountInOctas = new U64(Math.floor(amount * 1_000_000));
-      const entryFeeInOctas = new U64(Math.floor(entryFee * 1_000_000));
-      const durationInSeconds = duration * 24 * 60 * 60;
-      const response = await signAndSubmitTransaction({
-        data: {
-          function: `${MODULE_ADDRESS}::${MODULE_NAME}::create_pot_entry`,
+      const amountInOctas = BigInt(Math.floor(amount * 1_000_000));
+      const entryFeeInOctas = BigInt(Math.floor(entryFee * 1_000_000));
+      const durationInSeconds = BigInt(duration * 24 * 60 * 60);
+      
+      // Use the generated ABI functions
+      const response = await money_pot_manager.entry.createPotEntry(
+        aptos,
+        account,
+        {
           typeArguments: [],
           functionArguments: [
-            amountInOctas.toString(),
-            durationInSeconds.toString(),
-            entryFeeInOctas.toString(),
+            amountInOctas,
+            durationInSeconds,
+            entryFeeInOctas,
             oneFaAddress,
           ],
         }
+      );
+      
+      // Wait for transaction to complete
+      const result = await aptos.waitForTransaction({
+        transactionHash: response.hash,
       });
-      const client = (window as any).aptos;
-      const result = await client.waitForTransactionWithResult(response.hash);
-      const potId = result.events.find((e: any) => e.type.includes("PotCreatedEvent"))?.data.pot_id;
-      if (!potId) {
+      
+      // Extract pot_id from events
+      const potCreatedEvent = result.events.find((e: any) => 
+        e.type.includes("PotCreatedEvent") || e.type.includes("created")
+      );
+      
+      if (!potCreatedEvent) {
         throw new Error("Could not find PotCreatedEvent in transaction result.");
       }
+      
+      const potId = potCreatedEvent.data.pot_id || potCreatedEvent.data.id;
+      if (!potId) {
+        throw new Error("Could not extract pot_id from event data.");
+      }
+      
       toast.loading("Registering pot with verifier...", { id: toastId });
-      await registerPot({ potId, password, legend: colorMap, oneFaAddress });
-      const potsResource = await aptos.getAccountResource({ accountAddress: MODULE_ADDRESS, resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::Pots` });
-      const potsTableHandle = (potsResource.data as any).pots.handle;
-      const onChainPot = await aptos.getTableItem({ handle: potsTableHandle, data: { key: potId, key_type: "u64", value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::MoneyPot` } });
-      const newPot = transformToPot(onChainPot);
+      
+      // Register with verifier service
+      await registerPot({ 
+        potId: potId.toString(), 
+        password, 
+        legend: colorMap, 
+        oneFaAddress 
+      });
+      
+      // Fetch the created pot from blockchain
+      const [potData] = await money_pot_manager.view.getPot(aptos, {
+        functionArguments: [BigInt(potId)]
+      });
+      
+      const newPot = transformToPot(potData);
       addPot(newPot);
+      
       toast.dismiss(toastId);
       setCreationSuccess(true);
       setTimeout(() => navigate("/pots"), 3000);

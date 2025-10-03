@@ -4,6 +4,7 @@ import { aptos, MODULE_ADDRESS, MODULE_NAME } from '@/lib/aptos';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { AptosApiError } from '@aptos-labs/ts-sdk';
 import { initialMockPots } from '@/lib/mock-data';
+import * as money_pot_manager from '@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f';
 const ATTEMPTS_STORAGE_KEY = 'money-pot-attempts';
 interface PotState {
   pots: Pot[];
@@ -23,10 +24,10 @@ const POT_TITLES = [
   "The Oracle's Test", "Titan's Treasure", "The Ruby Cipher"
 ];
 export const transformToPot = (onChainPot: any): Pot => {
-  const totalValue = parseInt(onChainPot.total_usdc) / 1_000_000; // Assuming 6 decimals for USDC
-  const entryFee = parseInt(onChainPot.entry_fee) / 1_000_000;
+  const totalValue = Number(onChainPot.total_amount) / 1_000_000; // Assuming 6 decimals for USDC
+  const entryFee = Number(onChainPot.fee) / 1_000_000;
   const potentialReward = totalValue * 0.4;
-  const expiresAt = new Date(parseInt(onChainPot.expires_at) * 1000);
+  const expiresAt = new Date(Number(onChainPot.expires_at) * 1000);
   const isExpired = expiresAt < new Date();
   const timeLeft = isExpired
     ? `Expired ${formatDistanceToNowStrict(expiresAt, { addSuffix: true })}`
@@ -34,7 +35,8 @@ export const transformToPot = (onChainPot: any): Pot => {
   const difficulty = Math.min(Number(onChainPot.attempts_count) % 11 + 2, Number(onChainPot.attempts_count) + 2);
   return {
     ...onChainPot,
-    title: POT_TITLES[parseInt(onChainPot.id) % POT_TITLES.length],
+    id: onChainPot.id.toString(),
+    title: POT_TITLES[Number(onChainPot.id) % POT_TITLES.length],
     totalValue,
     entryFee,
     potentialReward,
@@ -63,34 +65,26 @@ export const usePotStore = create<PotState>((set, get) => ({
   fetchPots: async () => {
     set({ loading: true, error: null });
     try {
-      // TODO: Direct Aptos integration
-      const potsResource = await aptos.getAccountResource({
-        accountAddress: MODULE_ADDRESS,
-        resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::Pots`,
-      });
-      const potsTableHandle = (potsResource.data as any).pots.handle;
-      const potIds = (potsResource.data as any).pot_ids;
-      const potPromises = potIds.map((id: string) =>
-        // TODO: Direct Aptos integration
-        aptos.getTableItem({
-          handle: potsTableHandle,
-          data: {
-            key: id,
-            key_type: "u64",
-            value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::MoneyPot`,
-          },
+      // Use the generated ABI functions
+      const [potIds] = await money_pot_manager.view.getPots(aptos);
+      
+      if (potIds.length === 0) {
+        set({ loading: false }); // Stop loading but keep mock data
+        return;
+      }
+      
+      const potPromises = potIds.map((id: bigint) =>
+        money_pot_manager.view.getPot(aptos, {
+          functionArguments: [id]
         })
       );
+      
       const onChainPots = await Promise.all(potPromises);
-      const transformedPots = onChainPots.map(transformToPot);
-      // FIX: Only overwrite initial mock data if the blockchain returns actual pots.
-      if (transformedPots.length > 0) {
-        set({ pots: transformedPots, loading: false });
-      } else {
-        set({ loading: false }); // Stop loading but keep mock data
-      }
+      const transformedPots = onChainPots.map(([pot]) => transformToPot(pot));
+      
+      set({ pots: transformedPots, loading: false });
     } catch (error) {
-      // FIX: On 404 (or other errors), stop loading but do not clear mock data.
+      // On 404 (or other errors), stop loading but do not clear mock data.
       if (error instanceof AptosApiError && error.status === 404) {
         console.log("No pots found on-chain, displaying mock data.");
         set({ loading: false });
@@ -109,21 +103,11 @@ export const usePotStore = create<PotState>((set, get) => ({
     }
     set({ loading: true, error: null, currentPot: null });
     try {
-      // TODO: Direct Aptos integration
-      const potsResource = await aptos.getAccountResource({
-        accountAddress: MODULE_ADDRESS,
-        resourceType: `${MODULE_ADDRESS}::${MODULE_NAME}::Pots`,
+      // Use the generated ABI functions
+      const [onChainPot] = await money_pot_manager.view.getPot(aptos, {
+        functionArguments: [BigInt(id)]
       });
-      const potsTableHandle = (potsResource.data as any).pots.handle;
-      // TODO: Direct Aptos integration
-      const onChainPot = await aptos.getTableItem({
-        handle: potsTableHandle,
-        data: {
-          key: id,
-          key_type: "u64",
-          value_type: `${MODULE_ADDRESS}::${MODULE_NAME}::MoneyPot`,
-        },
-      });
+      
       const transformedPot = transformToPot(onChainPot);
       set({ currentPot: transformedPot, loading: false });
     } catch (error) {
