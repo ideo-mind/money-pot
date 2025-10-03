@@ -2,7 +2,7 @@
 
 A provably fair, skill-based gaming dApp on Aptos where users create and solve USDC-funded treasure hunts using a unique authentication challenge.
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/laciferin2024/generated-app-20251003-173130)
 
 ## About The Project
 
@@ -86,7 +86,7 @@ This project is configured for seamless deployment to Cloudflare Pages.
 
 Alternatively, you can connect your GitHub repository to Cloudflare Pages for automatic deployments on every push to your main branch.
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/laciferin2024/generated-app-20251003-173130)
 
 ## Project Structure
 
