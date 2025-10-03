@@ -14,6 +14,7 @@ import { PotCardSkeleton } from "@/components/PotCardSkeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Account, PrivateKey } from "@aptos-labs/ts-sdk";
+import { getOneFaKey, storeOneFaKey } from "@/lib/oneFaStorage";
 type GameState = "idle" | "paying" | "fetching_challenge" | "playing" | "verifying" | "won" | "lost";
 type KeyState = "unchecked" | "validating" | "valid" | "invalid";
 export function PotChallengePage() {
@@ -28,6 +29,7 @@ export function PotChallengePage() {
   const [gameState, setGameState] = useState<GameState>("idle");
   const [oneFaPrivateKey, setOneFaPrivateKey] = useState("");
   const [keyState, setKeyState] = useState<KeyState>("unchecked");
+  const [isAutoCompleted, setIsAutoCompleted] = useState(false);
   const [challenges, setChallenges] = useState<any[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
   const [solutions, setSolutions] = useState<string[]>([]);
@@ -47,6 +49,9 @@ export function PotChallengePage() {
       const account = Account.fromPrivateKey({ privateKey: privateKeyObject });
       if (account.accountAddress.toString() === pot.one_fa_address) {
         setKeyState("valid");
+        // Store the valid key for future use
+        storeOneFaKey(pot.one_fa_address, key);
+        console.log(`Stored 1FA key for address: ${pot.one_fa_address}`);
       } else {
         setKeyState("invalid");
       }
@@ -57,14 +62,28 @@ export function PotChallengePage() {
   // Effect to pre-fill and validate key if available
   useEffect(() => {
     if (pot?.one_fa_private_key) {
+      // Use the key from pot data (for mock pots)
       setOneFaPrivateKey(pot.one_fa_private_key);
       validateKey(pot.one_fa_private_key);
+      setIsAutoCompleted(false);
+    } else if (pot?.one_fa_address) {
+      // Check localStorage for stored key
+      const storedKey = getOneFaKey(pot.one_fa_address);
+      if (storedKey) {
+        console.log(`Auto-completing 1FA key for address: ${pot.one_fa_address}`);
+        setOneFaPrivateKey(storedKey);
+        validateKey(storedKey);
+        setIsAutoCompleted(true);
+      } else {
+        setIsAutoCompleted(false);
+      }
     }
   }, [pot, validateKey]);
   const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const key = e.target.value;
     setOneFaPrivateKey(key);
     if (keyState !== "unchecked") setKeyState("unchecked");
+    setIsAutoCompleted(false); // Reset auto-completed flag when user manually changes key
   };
   const handleAttempt = async () => {
     if (!connected || !pot || keyState !== 'valid') return;
@@ -206,9 +225,21 @@ export function PotChallengePage() {
             <div className="space-y-2 text-left">
               <Label htmlFor="1fa-key">1FA Private Key</Label>
               <div className="relative">
-                <Input id="1fa-key" placeholder="0x..." value={oneFaPrivateKey} onChange={handleKeyChange} className="pr-10" />
+                <Input 
+                  id="1fa-key" 
+                  placeholder="0x..." 
+                  value={oneFaPrivateKey} 
+                  onChange={handleKeyChange} 
+                  className={`pr-10 ${isAutoCompleted ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : ''}`}
+                />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">{KeyIcon}</div>
               </div>
+              {isAutoCompleted && (
+                <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Auto-completed from stored keys
+                </p>
+              )}
               <div className="flex justify-end">
                 <Button variant="link" size="sm" onClick={() => validateKey(oneFaPrivateKey)} disabled={!oneFaPrivateKey || keyState === 'validating'}>Validate Key</Button>
               </div>
