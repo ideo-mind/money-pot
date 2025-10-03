@@ -69,7 +69,7 @@ export const usePotStore = create<PotState>((set, get) => ({
       const [potIds] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPots(aptos);
       
       if (potIds.length === 0) {
-        set({ loading: false }); // Stop loading but keep mock data
+        set({ pots: [], loading: false }); // No pots found, show empty state
         return;
       }
       
@@ -84,18 +84,16 @@ export const usePotStore = create<PotState>((set, get) => ({
       
       set({ pots: transformedPots, loading: false });
     } catch (error) {
-      // On 404 (or other errors), stop loading but do not clear mock data.
-      if (error instanceof AptosApiError && error.status === 404) {
-        console.log("No pots found on-chain, displaying mock data.");
-        set({ loading: false });
-      } else {
-        console.error("Failed to fetch pots:", error);
-        set({ error: "Failed to fetch pots from the blockchain.", loading: false });
-      }
+      console.error("Failed to fetch pots:", error);
+      set({ 
+        error: "Failed to fetch pots from the blockchain.", 
+        loading: false,
+        pots: [] // Clear pots on error
+      });
     }
   },
   fetchPotById: async (id: string) => {
-    // First, check if the pot is in the local state (including mock pots)
+    // First, check if the pot is in the local state
     const localPot = get().pots.find(p => p.id === id);
     if (localPot) {
       set({ currentPot: localPot, loading: false, error: null });

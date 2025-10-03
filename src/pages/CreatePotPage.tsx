@@ -12,6 +12,7 @@ import { Account, U64 } from "@aptos-labs/ts-sdk";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { registerPot } from "@/lib/api";
 import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from "@/abis";
+import type { money_pot_manager } from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CopyableInput } from "@/components/CopyableInput";
@@ -129,18 +130,24 @@ export function CreatePotPage() {
         transactionHash: response.hash,
       });
       
-      // Extract pot_id from events
-      const potCreatedEvent = (result as any).events?.find((e: any) => 
-        e.type.includes("PotCreatedEvent") || e.type.includes("created")
-      );
+      // Extract pot_id from events using proper PotEvent type
+      const potCreatedEvent = (result as any).events?.find((e: any) => {
+        // Look for PotEvent with event_type containing "created"
+        if (e.type.includes("PotEvent")) {
+          const eventData = e.data as money_pot_manager.PotEvent;
+          return eventData.event_type.includes("created");
+        }
+        return false;
+      });
       
       if (!potCreatedEvent) {
         throw new Error("Could not find PotCreatedEvent in transaction result.");
       }
       
-      const potId = potCreatedEvent.data.pot_id || potCreatedEvent.data.id;
+      const eventData = potCreatedEvent.data as money_pot_manager.PotEvent;
+      const potId = eventData.id;
       if (!potId) {
-        throw new Error("Could not extract pot_id from event data.");
+        throw new Error("Could not extract pot_id from PotEvent data.");
       }
       
       toast.loading("Registering pot with verifier...", { id: toastId });

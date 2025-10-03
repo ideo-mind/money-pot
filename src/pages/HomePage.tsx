@@ -128,9 +128,20 @@ export function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {loading
               ? Array.from({ length: 3 }).map((_, i) => <PotCardSkeleton key={i} />)
-              : featuredPots.map((pot) => (
+              : featuredPots.length > 0 ? featuredPots.map((pot) => (
                   <PotCard key={pot.id} pot={pot} />
-                ))}
+                )) : (
+                  <div className="col-span-full text-center py-16">
+                    <div className="text-6xl mb-4">🏺</div>
+                    <h3 className="text-2xl font-display font-bold mb-2">No Featured Pots</h3>
+                    <p className="text-slate-600 dark:text-slate-300 mb-8">
+                      No treasure hunts are available yet. Create the first one!
+                    </p>
+                    <Button asChild size="lg">
+                      <Link to="/create">Create Your First Pot</Link>
+                    </Button>
+                  </div>
+                )}
           </div>
           <div className="mt-16 text-center">
             <Button asChild size="lg" variant="outline" className="font-bold">

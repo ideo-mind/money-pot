@@ -9,6 +9,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { getAuthOptions, verifyAuth } from "@/lib/api";
 import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from "@/abis";
+import type { money_pot_manager } from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -85,18 +86,24 @@ export function PotChallengePage() {
         transactionHash: response.hash,
       });
       
-      // Extract attempt_id from events
-      const attemptEvent = result.events.find((e: any) => 
-        e.type.includes("AttemptEvent") || e.type.includes("attempt")
-      );
+      // Extract attempt_id from events using proper PotEvent type
+      const attemptEvent = (result as any).events?.find((e: any) => {
+        // Look for PotEvent with event_type containing "attempted"
+        if (e.type.includes("PotEvent")) {
+          const eventData = e.data as money_pot_manager.PotEvent;
+          return eventData.event_type.includes("attempted");
+        }
+        return false;
+      });
       
       if (!attemptEvent) {
         throw new Error("Could not find AttemptEvent in transaction result.");
       }
       
-      const attemptId = attemptEvent.data.attempt_id || attemptEvent.data.id;
+      const eventData = attemptEvent.data as money_pot_manager.PotEvent;
+      const attemptId = eventData.id;
       if (!attemptId) {
-        throw new Error("Could not extract attempt_id from event data.");
+        throw new Error("Could not extract attempt_id from PotEvent data.");
       }
       
       toast.success("Entry fee paid! Fetching challenge...", { id: toastId });

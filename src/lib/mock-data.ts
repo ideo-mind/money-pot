@@ -37,47 +37,4 @@ export const mockLeaderboardData: { topCreators: LeaderboardUser[], topHunters: 
     { rank: 5, avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=hunter5', username: '0x...4e6a', amount: 6100 },
   ]
 };
-export const initialMockPots: Pot[] = [
-  {
-    id: "101",
-    creator: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-    total_usdc: "250000000",
-    entry_fee: "2500000",
-    created_at: String(Math.floor(Date.now() / 1000) - 86400),
-    expires_at: String(Math.floor(Date.now() / 1000) + 86400 * 4),
-    is_active: true,
-    attempts_count: "12",
-    one_fa_address: "0x2b1e7535c382a857a051535b40a386e3e5b32e030b355e11a0d35f8a79b20a55",
-    one_fa_private_key: "0x3f223802769145295186e331c26f39b183d31cb733a758f2a5111b1686884f7b",
-    title: "Galleon's Gold",
-    totalValue: 250,
-    entryFee: 2.5,
-    potentialReward: 100,
-    timeLeft: "4d",
-    creatorAvatar: "https://api.dicebear.com/8.x/pixel-art/svg?seed=deadbeef",
-    creatorUsername: "0xdead...beef",
-    difficulty: 3,
-    isExpired: false,
-  },
-  {
-    id: "102",
-    creator: "0xfeedcafefeedcafefeedcafefeedcafefeedcafefeedcafefeedcafefeedcafe",
-    total_usdc: "50000000",
-    entry_fee: "1000000",
-    created_at: String(Math.floor(Date.now() / 1000) - 86400 * 2),
-    expires_at: String(Math.floor(Date.now() / 1000) + 86400 * 2),
-    is_active: true,
-    attempts_count: "3",
-    one_fa_address: "0x8d3c605033575505b542e128c3a707512a202d212128a8b54b5f54a32e1a37c7",
-    one_fa_private_key: "0x81d2f923f63e21e5509111655ce50892a1b3c0717554727a30e03566a58f3b0a",
-    title: "The Alchemist's Secret",
-    totalValue: 50,
-    entryFee: 1,
-    potentialReward: 20,
-    timeLeft: "2d",
-    creatorAvatar: "https://api.dicebear.com/8.x/pixel-art/svg?seed=feedcafe",
-    creatorUsername: "0xfeed...cafe",
-    difficulty: 2,
-    isExpired: false,
-  }
-];
+export const initialMockPots: Pot[] = [];
