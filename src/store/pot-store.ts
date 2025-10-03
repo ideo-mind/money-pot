@@ -38,7 +38,37 @@ export const transformToPot = (onChainPot: any): Pot => {
   const totalValue = Number(onChainPot.total_amount) / 1_000_000; // Assuming 6 decimals for USDC
   const entryFee = Number(onChainPot.fee) / 1_000_000;
   const potentialReward = totalValue * 0.4;
-  const expiresAt = new Date(Number(onChainPot.expires_at) * 1000);
+  
+  // Handle different possible formats for expires_at
+  let expiresAt: Date;
+  try {
+    if (typeof onChainPot.expires_at === 'string') {
+      // If it's already a string, try to parse it directly
+      expiresAt = new Date(onChainPot.expires_at);
+    } else if (typeof onChainPot.expires_at === 'number') {
+      // If it's a number, assume it's Unix timestamp in seconds
+      expiresAt = new Date(onChainPot.expires_at * 1000);
+    } else if (onChainPot.expires_at && typeof onChainPot.expires_at.toString === 'function') {
+      // If it's a BigInt or other object, convert to string first
+      const timestamp = parseInt(onChainPot.expires_at.toString());
+      expiresAt = new Date(timestamp * 1000);
+    } else {
+      // Fallback: assume it's already a valid timestamp
+      expiresAt = new Date(onChainPot.expires_at);
+    }
+    
+    // Validate the date
+    if (isNaN(expiresAt.getTime())) {
+      console.warn('Invalid expiration date for pot:', onChainPot.id, 'expires_at:', onChainPot.expires_at);
+      // Set a default expiration time (24 hours from now)
+      expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
+  } catch (error) {
+    console.error('Error parsing expiration date:', error);
+    // Set a default expiration time (24 hours from now)
+    expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  }
+  
   const isExpired = expiresAt < new Date();
   const timeLeft = isExpired
     ? `Expired ${formatDistanceToNowStrict(expiresAt, { addSuffix: true })}`
