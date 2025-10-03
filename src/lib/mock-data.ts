@@ -1,26 +1,5 @@
 import { LeaderboardUser, Pot } from "@/types";
-export const mockPots: Pot[] = [
-  {
-    id: '1',
-    title: "The Serpent's Riddle",
-    totalValue: 1500,
-    entryFee: 15,
-    potentialReward: 600,
-    timeLeft: "3d 12h",
-    creatorAvatar: "https://i.pravatar.cc/150?u=serpent",
-    creatorUsername: "CryptoKing",
-    difficulty: 3,
-    creator: "0x1",
-    total_usdc: "1500000000",
-    entry_fee: "15000000",
-    created_at: "1672531200",
-    expires_at: "1672876800",
-    is_active: true,
-    attempts_count: "5",
-    one_fa_address: "0xfa1",
-    isExpired: false,
-  },
-];
+// Removed mockPots array - no longer needed
 export const mockLeaderboardData: { topCreators: LeaderboardUser[], topHunters: LeaderboardUser[] } = {
   topCreators: [
     { rank: 1, avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=creator1', username: '0x...a4f2', amount: 25000 },
@@ -37,4 +16,4 @@ export const mockLeaderboardData: { topCreators: LeaderboardUser[], topHunters: 
     { rank: 5, avatar: 'https://api.dicebear.com/8.x/pixel-art/svg?seed=hunter5', username: '0x...4e6a', amount: 6100 },
   ]
 };
-export const initialMockPots: Pot[] = [];
+// Removed initialMockPots - no longer needed

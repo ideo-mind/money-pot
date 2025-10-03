@@ -54,7 +54,7 @@ export function PotChallengePage() {
       setKeyState("invalid");
     }
   }, [pot]);
-  // Effect to pre-fill and validate key for mock pots
+  // Effect to pre-fill and validate key if available
   useEffect(() => {
     if (pot?.one_fa_private_key) {
       setOneFaPrivateKey(pot.one_fa_private_key);

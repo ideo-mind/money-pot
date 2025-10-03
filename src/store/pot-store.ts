@@ -3,7 +3,7 @@ import { Pot, Attempt } from '@/types';
 import { aptos, MODULE_ADDRESS, MODULE_NAME } from '@/lib/aptos';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { AptosApiError } from '@aptos-labs/ts-sdk';
-import { initialMockPots } from '@/lib/mock-data';
+// Removed import of initialMockPots - starting with empty array
 import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from '@/abis';
 const ATTEMPTS_STORAGE_KEY = 'money-pot-attempts';
 interface PotState {
@@ -18,11 +18,7 @@ interface PotState {
   addAttempt: (attempt: Attempt) => void;
   addPot: (pot: Pot) => void;
 }
-const POT_TITLES = [
-  "The Serpent's Riddle", "Galleon's Gold", "The Quick Brown Fox",
-  "Emerald Enigma", "The Alchemist's Secret", "Beginner's Luck",
-  "The Oracle's Test", "Titan's Treasure", "The Ruby Cipher"
-];
+// Removed POT_TITLES array - using Pot #ID format instead
 export const transformToPot = (onChainPot: any): Pot => {
   const totalValue = Number(onChainPot.total_amount) / 1_000_000; // Assuming 6 decimals for USDC
   const entryFee = Number(onChainPot.fee) / 1_000_000;
@@ -36,7 +32,7 @@ export const transformToPot = (onChainPot: any): Pot => {
   return {
     ...onChainPot,
     id: onChainPot.id.toString(),
-    title: POT_TITLES[Number(onChainPot.id) % POT_TITLES.length],
+    title: `Pot #${onChainPot.id}`,
     totalValue,
     entryFee,
     potentialReward,
@@ -57,7 +53,7 @@ const loadAttemptsFromStorage = (): Attempt[] => {
   }
 };
 export const usePotStore = create<PotState>((set, get) => ({
-  pots: initialMockPots,
+  pots: [], // Start with empty array - no mock pots
   currentPot: null,
   attempts: loadAttemptsFromStorage(),
   loading: false,
@@ -75,7 +71,7 @@ export const usePotStore = create<PotState>((set, get) => ({
       
       const potPromises = potIds.map((id: bigint) =>
         _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
-          functionArguments: [id.toString()]
+          functionArguments: [id]
         })
       );
       
@@ -103,7 +99,7 @@ export const usePotStore = create<PotState>((set, get) => ({
     try {
       // Use the generated ABI functions
       const [onChainPot] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
-        functionArguments: [BigInt(id).toString()]
+        functionArguments: [BigInt(id)]
       });
       
       const transformedPot = transformToPot(onChainPot);
