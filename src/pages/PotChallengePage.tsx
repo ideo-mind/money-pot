@@ -321,11 +321,10 @@ export function PotChallengePage() {
     console.log("Submitting move:", move);
     console.log("Current solutions:", solutions);
     
-    setSolutions(prevSolutions => {
-      const newSolutions = [...prevSolutions, move];
-      console.log("New solutions array:", newSolutions);
-      return newSolutions;
-    });
+    const updatedSolutions = [...solutions, move];
+    console.log("New solutions array:", updatedSolutions);
+    
+    setSolutions(updatedSolutions);
     
     // Reset submitting state after a delay to prevent rapid clicks
     setTimeout(() => {
@@ -362,25 +361,16 @@ export function PotChallengePage() {
         // Verify solutions with verifier service using attempt_id as challenge_id
         console.log("Sending solutions to /authenticate/verify:", {
           attemptId: attemptId.toString(),
-          solutions: newSolutions,
-          solutionsCount: newSolutions.length
+          solutions: updatedSolutions,
+          solutionsCount: updatedSolutions.length
         });
         
-        const verifyResponse = await verifyAuth(attemptId.toString(), newSolutions);
+        const verifyResponse = await verifyAuth(attemptId.toString(), updatedSolutions);
         console.log("Response from /authenticate/verify:", verifyResponse);
         
         const { success } = verifyResponse;
         
-        // Update blockchain with result
-        await signAndSubmitTransaction({
-          sender: account!.address,
-          data: {
-            function: `${MODULE_ADDRESS}::${MODULE_NAME}::attempt_completed`,
-            typeArguments: [],
-            functionArguments: [BigInt(attemptId).toString(), success],
-          },
-        });
-        
+        // Add attempt to local history (verifier service handles blockchain)
         addAttempt({ potId: pot!.id, potTitle: pot!.title, status: success ? 'won' : 'lost', date: new Date().toISOString() });
         
         if (success) {
