@@ -191,14 +191,37 @@ export function PotChallengePage() {
       const hunterAddress = account!.address;
       console.log("Getting 1P challenges for hunter:", hunterAddress);
       
-      const { challenges: fetchedChallenges } = await getAuthOptions(extractedAttemptId.toString(), hunterAddress.toString());
-      console.log("Received 1P challenges:", fetchedChallenges);
-      
-      // Set challenges for human interaction
-      setChallenges(fetchedChallenges);
-      setCurrentRound(0);
-      setSolutions([]);
-      setGameState("playing");
+      try {
+        const authResponse = await getAuthOptions(extractedAttemptId.toString(), hunterAddress.toString());
+        console.log("Full auth response:", authResponse);
+        
+        const fetchedChallenges = authResponse.challenges || [];
+        console.log("Received 1P challenges:", fetchedChallenges);
+        console.log("Number of challenges:", fetchedChallenges.length);
+        
+        if (fetchedChallenges.length > 0) {
+          console.log("First challenge structure:", fetchedChallenges[0]);
+        }
+        
+        // Check if we got valid challenges
+        if (fetchedChallenges.length === 0) {
+          throw new Error("No challenges received from verifier service");
+        }
+        
+        // Set challenges for human interaction
+        setChallenges(fetchedChallenges);
+        setCurrentRound(0);
+        setSolutions([]);
+        setGameState("playing");
+      } catch (authError) {
+        console.error("Failed to get 1P challenges:", authError);
+        toast.error("Failed to get 1P challenges from verifier service", { 
+          id: toastId, 
+          description: authError instanceof Error ? authError.message : 'Unknown error'
+        });
+        setGameState("idle");
+        return;
+      }
       
       // Update transaction as successful
       updateTransaction(txId, { 
@@ -354,6 +377,18 @@ export function PotChallengePage() {
   }
   if (!pot) return null;
   const currentChallenge = challenges[currentRound];
+  
+  // Safety check for challenge data
+  if (gameState === "playing" && (!challenges || challenges.length === 0)) {
+    console.error("No challenges available but game state is playing");
+    setGameState("idle");
+    return null;
+  }
+  
+  // Debug: Log the current challenge structure
+  if (currentChallenge) {
+    console.log("Current challenge structure:", currentChallenge);
+  }
   return (
     <div className="max-w-5xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
       <Toaster richColors position="top-right" />
@@ -447,17 +482,43 @@ export function PotChallengePage() {
                   1P Challenge {currentRound + 1} of {challenges.length}
                 </CardTitle>
                 <CardDescription className="text-center">
-                  Find the character: <span className="text-brand-gold font-mono text-2xl">{currentChallenge.targetChar}</span>
+                  Find the character: <span className="text-brand-gold font-mono text-2xl">{currentChallenge.targetChar || currentChallenge.target_char || '?'}</span>
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-5 gap-2 aspect-square">
-                  {currentChallenge.grid.map((cell: any) => (
-                    <div key={cell.id} className={`w-full h-full rounded-md flex items-center justify-center text-white font-bold text-2xl ${cell.color}`}>
-                      {cell.char}
-                    </div>
-                  ))}
-                </div>
+                {/* Handle different challenge data structures */}
+                {currentChallenge.grid && Array.isArray(currentChallenge.grid) ? (
+                  <div className="grid grid-cols-5 gap-2 aspect-square">
+                    {currentChallenge.grid.map((cell: any, index: number) => (
+                      <div key={cell.id || index} className={`w-full h-full rounded-md flex items-center justify-center text-white font-bold text-2xl ${cell.color || 'bg-gray-500'}`}>
+                        {cell.char || cell.character || '?'}
+                      </div>
+                    ))}
+                  </div>
+                ) : currentChallenge.colorGroups ? (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Color Groups:</h3>
+                    {Object.entries(currentChallenge.colorGroups).map(([color, chars]: [string, any]) => (
+                      <div key={color} className={`p-4 rounded-lg ${color === 'red' ? 'bg-red-100' : color === 'green' ? 'bg-green-100' : color === 'blue' ? 'bg-blue-100' : color === 'yellow' ? 'bg-yellow-100' : 'bg-gray-100'}`}>
+                        <div className="font-semibold capitalize">{color}:</div>
+                        <div className="flex gap-2 mt-2">
+                          {Array.isArray(chars) ? chars.map((char: string, i: number) => (
+                            <span key={i} className="px-2 py-1 bg-white rounded text-lg font-mono">{char}</span>
+                          )) : (
+                            <span className="px-2 py-1 bg-white rounded text-lg font-mono">{chars}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center p-8">
+                    <p className="text-lg text-muted-foreground">Challenge data received:</p>
+                    <pre className="mt-4 text-xs bg-gray-100 p-4 rounded overflow-auto">
+                      {JSON.stringify(currentChallenge, null, 2)}
+                    </pre>
+                  </div>
+                )}
                 <div className="mt-4 text-center text-sm text-muted-foreground">
                   Look for the target character and choose the direction based on its color group
                 </div>
