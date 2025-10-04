@@ -9,7 +9,7 @@ export function Layout() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2 group">
-              <img src="https://i.imgur.com/J4q42s0.png" alt="Money Pot Logo" className="w-8 h-8 group-hover:animate-pulse" />
+              <img src="/logo.png" alt="Money Pot Logo" className="w-8 h-8 group-hover:animate-pulse" loading="lazy" />
               <span className="text-2xl font-display font-bold text-slate-900 dark:text-slate-50">
                 Money Pot
               </span>
