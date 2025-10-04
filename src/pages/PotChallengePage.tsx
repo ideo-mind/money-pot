@@ -41,15 +41,32 @@ export function PotChallengePage() {
   const [selectedDirection, setSelectedDirection] = useState<string>("");
   const [showAnimation, setShowAnimation] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   useEffect(() => {
     if (id) {
       fetchPotById(id);
     }
   }, [id, fetchPotById]);
 
+  // Log solutions whenever they change
+  useEffect(() => {
+    console.log("Solutions state updated:", solutions);
+  }, [solutions]);
+
   const handleDirectionSelect = useCallback((direction: string) => {
-    if (gameState !== "playing") return;
+    if (gameState !== "playing" || isSubmitting) return;
     
+    // Prevent multiple submissions for the same challenge
+    if (solutions.length > currentRound) {
+      console.log("Already submitted solution for this challenge, ignoring duplicate");
+      return;
+    }
+    
+    console.log("Direction selected:", direction);
+    console.log("Current round:", currentRound, "Total challenges:", challenges.length);
+    console.log("Current solutions count:", solutions.length);
+    
+    setIsSubmitting(true);
     setSelectedDirection(direction);
     setShowAnimation(true);
     
@@ -64,8 +81,9 @@ export function PotChallengePage() {
       submitMove(direction);
       setSelectedDirection("");
       setShowAnimation(false);
+      setIsSubmitting(false);
     }, 500);
-  }, [gameState]);
+  }, [gameState, isSubmitting, solutions.length, currentRound, challenges.length]);
 
   // Hotkey support for better UX
   useEffect(() => {
@@ -254,6 +272,8 @@ export function PotChallengePage() {
       const fetchedChallenges = authResponse.challenges || [];
       console.log("Received 1P challenges:", fetchedChallenges);
       console.log("Number of challenges:", fetchedChallenges.length);
+      console.log("Pot difficulty:", pot?.difficulty);
+      console.log("Expected challenges based on difficulty:", pot?.difficulty);
       
       if (fetchedChallenges.length > 0) {
         console.log("First challenge structure:", fetchedChallenges[0]);
@@ -298,8 +318,19 @@ export function PotChallengePage() {
     }
   };
   const submitMove = async (move: string) => {
-    const newSolutions = [...solutions, move];
-    setSolutions(newSolutions);
+    console.log("Submitting move:", move);
+    console.log("Current solutions:", solutions);
+    
+    setSolutions(prevSolutions => {
+      const newSolutions = [...prevSolutions, move];
+      console.log("New solutions array:", newSolutions);
+      return newSolutions;
+    });
+    
+    // Reset submitting state after a delay to prevent rapid clicks
+    setTimeout(() => {
+      setIsSubmitting(false);
+    }, 1000);
     
     if (currentRound < challenges.length - 1) {
       // Start transition animation
@@ -329,7 +360,16 @@ export function PotChallengePage() {
       
       try {
         // Verify solutions with verifier service using attempt_id as challenge_id
-        const { success } = await verifyAuth(attemptId.toString(), newSolutions);
+        console.log("Sending solutions to /authenticate/verify:", {
+          attemptId: attemptId.toString(),
+          solutions: newSolutions,
+          solutionsCount: newSolutions.length
+        });
+        
+        const verifyResponse = await verifyAuth(attemptId.toString(), newSolutions);
+        console.log("Response from /authenticate/verify:", verifyResponse);
+        
+        const { success } = verifyResponse;
         
         // Update blockchain with result
         await signAndSubmitTransaction({
@@ -825,6 +865,105 @@ export function PotChallengePage() {
           </p>
           <Button onClick={() => navigate('/pots')} size="lg">Back to Pots</Button>
         </Card>
+      )}
+      
+      {/* Completion Screens */}
+      {gameState === "won" && (
+        <div className="text-center space-y-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-green-100 dark:bg-green-900/20 rounded-full">
+              <PartyPopper className="w-12 h-12 text-green-600 dark:text-green-400" />
+            </div>
+            <h2 className="text-4xl font-bold text-green-600 dark:text-green-400">Congratulations!</h2>
+            <p className="text-xl text-muted-foreground">You've successfully completed the 1P challenge!</p>
+          </div>
+          
+          <Card className="max-w-2xl mx-auto bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-green-700 dark:text-green-300">Challenge Completed</h3>
+                <p className="text-green-600 dark:text-green-400">All {challenges.length} challenges solved successfully</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-white/50 dark:bg-gray-800/50 p-3 rounded-lg">
+                  <div className="font-semibold text-green-700 dark:text-green-300">Pot Value</div>
+                  <div className="text-lg font-bold">{pot?.totalValue ? pot.totalValue.toFixed(2) : '0'} USDC</div>
+                </div>
+                <div className="bg-white/50 dark:bg-gray-800/50 p-3 rounded-lg">
+                  <div className="font-semibold text-green-700 dark:text-green-300">Entry Fee</div>
+                  <div className="text-lg font-bold">{pot?.entryFee ? pot.entryFee.toFixed(2) : '0'} USDC</div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <Button 
+                  onClick={() => navigate('/')} 
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  size="lg"
+                >
+                  Return to Home
+                </Button>
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  variant="outline" 
+                  className="w-full"
+                >
+                  Try Another Pot
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+      
+      {gameState === "lost" && (
+        <div className="text-center space-y-8">
+          <div className="space-y-4">
+            <div className="inline-flex items-center justify-center w-24 h-24 bg-red-100 dark:bg-red-900/20 rounded-full">
+              <XCircle className="w-12 h-12 text-red-600 dark:text-red-400" />
+            </div>
+            <h2 className="text-4xl font-bold text-red-600 dark:text-red-400">Challenge Failed</h2>
+            <p className="text-xl text-muted-foreground">Better luck next time!</p>
+          </div>
+          
+          <Card className="max-w-2xl mx-auto bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 border-red-200 dark:border-red-800">
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="space-y-2">
+                <h3 className="text-2xl font-bold text-red-700 dark:text-red-300">Authentication Failed</h3>
+                <p className="text-red-600 dark:text-red-400">The 1P challenge was not completed successfully</p>
+              </div>
+              
+              <div className="bg-white/50 dark:bg-gray-800/50 p-4 rounded-lg">
+                <div className="text-sm text-muted-foreground mb-2">Your Solutions:</div>
+                <div className="flex justify-center gap-2">
+                  {solutions.map((solution, index) => (
+                    <span key={index} className="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-sm font-mono">
+                      {solution}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <Button 
+                  onClick={() => navigate('/')} 
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                  size="lg"
+                >
+                  Return to Home
+                </Button>
+                <Button 
+                  onClick={() => window.location.reload()} 
+                  variant="outline" 
+                  className="w-full"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
