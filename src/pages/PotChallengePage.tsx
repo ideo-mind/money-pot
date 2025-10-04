@@ -250,13 +250,15 @@ export function PotChallengePage() {
         const authResponse = await getAuthOptions(extractedAttemptId.toString(), hunterAddress.toString());
         console.log("Full auth response:", authResponse);
         
-        const fetchedChallenges = authResponse.challenges || [];
-        console.log("Received 1P challenges:", fetchedChallenges);
-        console.log("Number of challenges:", fetchedChallenges.length);
-        
-        if (fetchedChallenges.length > 0) {
-          console.log("First challenge structure:", fetchedChallenges[0]);
-        }
+      const fetchedChallenges = authResponse.challenges || [];
+      console.log("Received 1P challenges:", fetchedChallenges);
+      console.log("Number of challenges:", fetchedChallenges.length);
+      
+      if (fetchedChallenges.length > 0) {
+        console.log("First challenge structure:", fetchedChallenges[0]);
+        console.log("First challenge grid length:", fetchedChallenges[0].grid?.length || 'No grid');
+        console.log("First challenge color groups:", fetchedChallenges[0].colorGroups);
+      }
         
         // Check if we got valid challenges
         if (fetchedChallenges.length === 0) {
@@ -468,156 +470,127 @@ export function PotChallengePage() {
       }
     };
 
-    if (challenge.colorGroups) {
-      // Create a comprehensive giant wall with ALL characters from ALL challenges
-      const allChars: Array<{char: string, color: string}> = [];
+    if (challenge.colorGroups && challenge.grid) {
+      // Display just the current challenge with organized color sections
+      const gridChars = challenge.grid.split('');
       
-      // Collect ALL characters from ALL color groups in ALL challenges
-      challenges.forEach((challengeItem: any) => {
-        if (challengeItem.colorGroups) {
-          Object.entries(challengeItem.colorGroups).forEach(([color, chars]: [string, any]) => {
-            const charsArray = Array.isArray(chars) ? chars : [chars];
-            charsArray.forEach((char: string) => {
-              allChars.push({ char, color });
-            });
-          });
-        }
-      });
-
-      // If no characters from other challenges, use current challenge
-      if (allChars.length === 0) {
+      // Group characters by color
+      const colorGroups: {[key: string]: string[]} = {
+        red: [],
+        green: [],
+        blue: [],
+        yellow: []
+      };
+      
+      // Distribute characters into their color groups
+      gridChars.forEach((char: string) => {
         Object.entries(challenge.colorGroups).forEach(([color, chars]: [string, any]) => {
-          const charsArray = Array.isArray(chars) ? chars : [chars];
-          charsArray.forEach((char: string) => {
-            allChars.push({ char, color });
-          });
+          if (chars.includes(char)) {
+            colorGroups[color].push(char);
+          }
         });
-      }
-
-      // Create a proper wall layout - calculate optimal grid size for ALL characters
-      const totalChars = allChars.length;
-      const cols = Math.max(12, Math.ceil(Math.sqrt(totalChars * 1.5))); // Wider grid, minimum 12 columns
-      const rows = Math.ceil(totalChars / cols);
-
-      // Distribute characters across the grid
-      const wallGrid: Array<{char: string, color: string} | null>[] = [];
-      for (let row = 0; row < rows; row++) {
-        const rowChars: Array<{char: string, color: string} | null> = [];
-        for (let col = 0; col < cols; col++) {
-          const index = row * cols + col;
-          rowChars.push(index < allChars.length ? allChars[index] : null);
-        }
-        wallGrid.push(rowChars);
-      }
+      });
 
       return (
         <div className="space-y-6">
           <div className="text-center">
-            <h3 className="text-2xl font-bold mb-2">Find the character:</h3>
-            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse drop-shadow-lg">
-              {challenge.targetChar || challenge.target_char || '?'}
-            </div>
+            <h3 className="text-2xl font-bold mb-2">Find the character in the sections below</h3>
             <p className="text-sm text-muted-foreground mt-2">
-              Look for the character in the wall below and choose the direction based on its color section
+              Choose the direction based on the character's color section
             </p>
           </div>
           
-          {/* Comprehensive giant wall with ALL characters from ALL challenges */}
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-7xl mx-auto overflow-x-auto">
-            <div className="space-y-1 min-w-max">
-              {wallGrid.map((row, rowIndex) => (
-                <div key={rowIndex} className="flex justify-center gap-1">
-                  {row.map((item, index) => (
+          {/* Clean 4-section color grid with thick separation */}
+          <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-4xl mx-auto">
+            <div className="grid grid-cols-2 gap-6">
+              {/* Red Section */}
+              <div className="bg-red-500 p-4 rounded-lg">
+                <div className="grid grid-cols-4 gap-2">
+                  {colorGroups.red.map((char, index) => (
                     <div 
-                      key={`${rowIndex}-${index}`} 
-                      className={`aspect-square w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs shadow-sm transform transition-all duration-200 hover:scale-110 ${
-                        item ? getColorClass(item.color) : 'bg-gray-300 dark:bg-gray-600'
-                      }`}
+                      key={index} 
+                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
                     >
-                      {item ? item.char : ''}
+                      {char}
                     </div>
                   ))}
                 </div>
-              ))}
+              </div>
+              
+              {/* Green Section */}
+              <div className="bg-green-500 p-4 rounded-lg">
+                <div className="grid grid-cols-4 gap-2">
+                  {colorGroups.green.map((char, index) => (
+                    <div 
+                      key={index} 
+                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
+                    >
+                      {char}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Blue Section */}
+              <div className="bg-blue-500 p-4 rounded-lg">
+                <div className="grid grid-cols-4 gap-2">
+                  {colorGroups.blue.map((char, index) => (
+                    <div 
+                      key={index} 
+                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
+                    >
+                      {char}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Yellow Section */}
+              <div className="bg-yellow-500 p-4 rounded-lg">
+                <div className="grid grid-cols-4 gap-2">
+                  {colorGroups.yellow.map((char, index) => (
+                    <div 
+                      key={index} 
+                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
+                    >
+                      {char}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           
           {/* Character count info */}
           <div className="text-center text-xs text-muted-foreground">
-            Showing {totalChars} characters across {rows} rows • Find the target character and choose the corresponding direction
+            Red: {colorGroups.red.length} • Green: {colorGroups.green.length} • Blue: {colorGroups.blue.length} • Yellow: {colorGroups.yellow.length} characters
           </div>
         </div>
       );
     }
 
-    if (challenge.grid && Array.isArray(challenge.grid)) {
-      // Collect ALL characters from ALL challenges with grid data
-      const allChars: Array<{char: string, color: string}> = [];
+    if (challenge.grid && typeof challenge.grid === 'string' && !challenge.colorGroups) {
+      // Handle string-based grid format without colorGroups (fallback)
+      const gridChars = challenge.grid.split('');
       
-      challenges.forEach((challengeItem: any) => {
-        if (challengeItem.grid && Array.isArray(challengeItem.grid)) {
-          challengeItem.grid.forEach((cell: any) => {
-            allChars.push({ 
-              char: cell.char || cell.character || '?', 
-              color: cell.color || 'gray' 
-            });
-          });
-        }
-      });
-
-      // If no characters from other challenges, use current challenge
-      if (allChars.length === 0) {
-        challenge.grid.forEach((cell: any) => {
-          allChars.push({ 
-            char: cell.char || cell.character || '?', 
-            color: cell.color || 'gray' 
-          });
-        });
-      }
-
-      // Create a proper wall layout for grid data
-      const totalChars = allChars.length;
-      const cols = Math.max(12, Math.ceil(Math.sqrt(totalChars * 1.5))); // Wider grid, minimum 12 columns
-      const rows = Math.ceil(totalChars / cols);
-
-      // Distribute characters across the grid
-      const wallGrid: Array<{char: string, color: string} | null>[] = [];
-      for (let row = 0; row < rows; row++) {
-        const rowChars: Array<{char: string, color: string} | null> = [];
-        for (let col = 0; col < cols; col++) {
-          const index = row * cols + col;
-          rowChars.push(index < allChars.length ? allChars[index] : null);
-        }
-        wallGrid.push(rowChars);
-      }
-
       return (
         <div className="space-y-6">
           <div className="text-center">
-            <h3 className="text-2xl font-bold mb-2">Find the character:</h3>
-            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse drop-shadow-lg">
-              {challenge.targetChar || challenge.target_char || '?'}
-            </div>
+            <h3 className="text-2xl font-bold mb-2">Find the character in the grid below</h3>
             <p className="text-sm text-muted-foreground mt-2">
-              Look for the character in the wall below and choose the direction based on its color section
+              Choose the direction based on the character's color section
             </p>
           </div>
           
-          {/* Comprehensive giant wall with ALL characters from ALL challenges */}
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-7xl mx-auto overflow-x-auto">
-            <div className="space-y-1 min-w-max">
-              {wallGrid.map((row, rowIndex) => (
-                <div key={rowIndex} className="flex justify-center gap-1">
-                  {row.map((item, index) => (
-                    <div 
-                      key={`${rowIndex}-${index}`} 
-                      className={`aspect-square w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs shadow-sm transform transition-all duration-200 hover:scale-110 ${
-                        item ? getColorClass(item.color) : 'bg-gray-300 dark:bg-gray-600'
-                      }`}
-                    >
-                      {item ? item.char : ''}
-                    </div>
-                  ))}
+          {/* Simple grid display */}
+          <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-4xl mx-auto">
+            <div className="grid grid-cols-8 gap-1">
+              {gridChars.map((char, index) => (
+                <div 
+                  key={index} 
+                  className="aspect-square bg-gray-500 rounded-sm flex items-center justify-center text-white font-bold text-sm shadow-sm transform transition-all duration-200 hover:scale-110"
+                >
+                  {char}
                 </div>
               ))}
             </div>
@@ -625,7 +598,7 @@ export function PotChallengePage() {
           
           {/* Character count info */}
           <div className="text-center text-xs text-muted-foreground">
-            Showing {totalChars} characters across {rows} rows • Find the target character and choose the corresponding direction
+            Showing {gridChars.length} characters
           </div>
         </div>
       );
@@ -646,7 +619,6 @@ export function PotChallengePage() {
       <Toaster richColors position="top-right" />
       <div className="text-center mb-12">
         <h1 className="text-4xl md:text-5xl font-display font-bold">{pot.title}</h1>
-        {gameState === "playing" && <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">Round {currentRound + 1} of {pot.difficulty}. Focus.</p>}
       </div>
       {gameState === "idle" && (
         <Card className="text-center p-8 max-w-2xl mx-auto">
@@ -731,7 +703,7 @@ export function PotChallengePage() {
           <div className="text-center">
             <div className="inline-flex items-center gap-3 bg-gradient-to-r from-brand-green to-brand-gold text-white px-6 py-3 rounded-full text-xl font-bold shadow-lg">
               <Zap className="w-6 h-6" />
-              Round {currentRound + 1} of {challenges.length}
+              Challenge {currentRound + 1} of {challenges.length}
             </div>
           </div>
 
@@ -821,7 +793,7 @@ export function PotChallengePage() {
                     ></div>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    Round {currentRound + 1} of {challenges.length}
+                    Challenge {currentRound + 1} of {challenges.length}
                   </div>
                 </CardContent>
               </Card>
