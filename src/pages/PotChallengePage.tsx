@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { usePotStore } from "@/store/pot-store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Loader2, PartyPopper, ShieldClose, SkipForward, CheckCircle2, XCircle, KeyRound, Zap } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Loader2, PartyPopper, ShieldClose, SkipForward, CheckCircle2, XCircle, KeyRound, Zap, Target } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
@@ -618,6 +618,16 @@ export function PotChallengePage() {
       <Toaster richColors position="top-right" />
       <div className="text-center mb-12">
         <h1 className="text-4xl md:text-5xl font-display font-bold">{pot.title}</h1>
+        <div className="mt-4 flex items-center justify-center gap-6 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4" />
+            <span>{parseInt(pot.attempts_count).toLocaleString()} attempts</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ShieldClose className="w-4 h-4" />
+            <span>Difficulty: {pot.difficulty}/5</span>
+          </div>
+        </div>
       </div>
       {gameState === "idle" && (
         <Card className="text-center p-8 max-w-2xl mx-auto">
@@ -650,14 +660,20 @@ export function PotChallengePage() {
             </div>
             <p className="text-lg">Pay the entry fee of <span className="font-bold text-brand-gold">{pot.entryFee} USDC</span> to begin.</p>
             <div className="space-y-3">
-              <Button 
-                onClick={handleAttempt} 
-                disabled={!connected || pot.isExpired} 
-                size="lg" 
-                className="w-full max-w-xs mx-auto bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg h-16"
-              >
-                {pot.isExpired ? "Pot Expired" : connected ? `Pay ${pot.entryFee} USDC & Start` : "Connect Wallet to Start"}
-              </Button>
+              {pot.isExpired ? (
+                <div className="w-full max-w-xs mx-auto bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold text-lg h-16 rounded-lg flex items-center justify-center cursor-not-allowed">
+                  Pot Expired
+                </div>
+              ) : (
+                <Button 
+                  onClick={handleAttempt} 
+                  disabled={!connected} 
+                  size="lg" 
+                  className="w-full max-w-xs mx-auto bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg h-16"
+                >
+                  {connected ? `Pay ${pot.entryFee} USDC & Start` : "Connect Wallet to Start"}
+                </Button>
+              )}
               
               {/* Show expire button if pot is expired but still active */}
               {pot.isExpired && pot.is_active && (

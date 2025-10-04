@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Clock, DollarSign, Gem, Shield, XCircle } from "lucide-react";
+import { Clock, DollarSign, Gem, Shield, XCircle, Users } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
 import { usePotStore } from "@/store/pot-store";
@@ -86,7 +86,7 @@ export function PotCard({ pot }: PotCardProps) {
           )}
         </CardHeader>
         <CardContent className="p-6 flex-grow space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             <div className="flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-brand-green" />
               <div>
@@ -119,6 +119,13 @@ export function PotCard({ pot }: PotCardProps) {
                 </div>
               </div>
             </div>
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <div>
+                <p className="text-muted-foreground">Attempts</p>
+                <p className="font-bold text-lg">{parseInt(pot.attempts_count).toLocaleString()}</p>
+              </div>
+            </div>
           </div>
         </CardContent>
         <CardFooter className="p-4 bg-slate-50 dark:bg-slate-900/50">
@@ -145,10 +152,14 @@ export function PotCard({ pot }: PotCardProps) {
                 This pot has timed out but is still active. Click to manually expire it.
               </p>
             </div>
+          ) : pot.isExpired ? (
+            <div className="w-full bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold py-3 px-4 rounded-lg text-center cursor-not-allowed">
+              Expired
+            </div>
           ) : (
-            <Button asChild className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold" disabled={pot.isExpired}>
+            <Button asChild className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold">
               <Link to={`/pots/${pot.id}`}>
-                {pot.isExpired ? "Expired" : `Attempt for $${pot.entryFee.toLocaleString()}`}
+                Attempt for ${pot.entryFee.toLocaleString()}
               </Link>
             </Button>
           )}
