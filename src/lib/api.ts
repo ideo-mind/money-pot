@@ -48,20 +48,23 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
 
     console.log("Payload data:", payloadData);
     
-    // Step 3: Convert payload to hex string (as per app.py MVP approach)
+    // Step 3: Follow app.py exactly - hex encode the JSON string
     const payloadJson = JSON.stringify(payloadData);
-    const encryptedPayload = Array.from(payloadJson)
-      .map(char => char.charCodeAt(0).toString(16).padStart(2, '0'))
+    console.log("Payload JSON:", payloadJson);
+    
+    // Convert JSON string to hex exactly like app.py: payload_json.encode().hex()
+    const encryptedPayload = Array.from(new TextEncoder().encode(payloadJson))
+      .map(byte => byte.toString(16).padStart(2, '0'))
       .join('');
     
-    console.log("Encrypted payload (hex):", encryptedPayload);
+    console.log("Payload (hex-encoded like app.py):", encryptedPayload);
     
     // Step 4: Register with verifier service
     const response = await fetch(`${VERIFIER_BASE_URL}/register/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        encrypted_payload: encryptedPayload,
+        encrypted_payload: encryptedPayload, // Use the expected field name
         public_key: optionsData.public_key,
         signature: 'mock_signature' // Simplified for MVP
       })
