@@ -13,7 +13,7 @@ export function HomePage() {
   useEffect(() => {
     fetchPots();
   }, [fetchPots]);
-  const featuredPots = pots.slice(0, 3);
+  const featuredPots = Object.values(pots).slice(0, 3);
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {

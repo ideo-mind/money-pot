@@ -41,7 +41,7 @@ export function PotsListPage() {
           </div>
         </div>
       )}
-      {!loading && !error && pots.length === 0 && (
+      {!loading && !error && Object.keys(pots).length === 0 && (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🏺</div>
           <h3 className="text-2xl font-display font-bold mb-2">No Pots Available</h3>
@@ -73,7 +73,7 @@ export function PotsListPage() {
               Loading pots in batches of 10 every 100 seconds
             </p>
             <p className="text-sm text-green-500 dark:text-green-500 mt-2">
-              Showing {pots.length} of {totalPots} pots
+              Showing {Object.keys(pots).length} of {totalPots} pots
               {hasMorePots && ` • Next batch in ${Math.max(0, 100 - ((Date.now() - (currentBatch * 100000)) / 1000))}s`}
             </p>
             <div className="mt-3 space-x-2">
@@ -100,7 +100,7 @@ export function PotsListPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => <PotCardSkeleton key={i} />)
-          : pots.map((pot) => (
+          : Object.values(pots).map((pot) => (
               <PotCard key={pot.id} pot={pot} />
             ))}
       </div>

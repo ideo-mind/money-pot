@@ -33,7 +33,7 @@ export function DashboardPage() {
   }, [connected, fetchPots]);
   const myCreatedPots = useMemo(() => {
     if (!account) return [];
-    return allPots.filter(pot => pot.creator === account.address.toString());
+    return Object.values(allPots).filter(pot => pot.creator === account.address.toString());
   }, [allPots, account]);
   const stats = useMemo(() => {
     const wins = attempts.filter(a => a.status === 'won').length;

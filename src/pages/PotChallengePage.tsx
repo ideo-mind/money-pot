@@ -90,7 +90,16 @@ export function PotChallengePage() {
     setIsAutoCompleted(false); // Reset auto-completed flag when user manually changes key
   };
   const handleAttempt = async () => {
-    if (!connected || !pot || keyState !== 'valid') return;
+    if (!connected || !pot) return;
+    
+    // Prevent attempts on expired pots
+    if (pot.isExpired) {
+      toast.error("This pot has expired and cannot be attempted");
+      return;
+    }
+    
+    // 1FA private key is now optional - allow attempts without it
+    // if (keyState !== 'valid') return;
     setGameState("paying");
     const toastId = toast.loading("Submitting entry fee transaction...");
     
@@ -322,11 +331,11 @@ export function PotChallengePage() {
         <Card className="text-center p-8 max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="text-3xl font-display">Ready to Hunt?</CardTitle>
-            <CardDescription>Enter the 1FA private key for this pot to proceed.</CardDescription>
+            <CardDescription>Optionally enter the 1FA private key for this pot, or proceed without it.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2 text-left">
-              <Label htmlFor="1fa-key">1FA Private Key</Label>
+              <Label htmlFor="1fa-key">1FA Private Key (Optional)</Label>
               <div className="relative">
                 <Input 
                   id="1fa-key" 
@@ -349,8 +358,13 @@ export function PotChallengePage() {
             </div>
             <p className="text-lg">Pay the entry fee of <span className="font-bold text-brand-gold">{pot.entryFee} USDC</span> to begin.</p>
             <div className="space-y-3">
-              <Button onClick={handleAttempt} disabled={!connected || keyState !== 'valid'} size="lg" className="w-full max-w-xs mx-auto bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg h-16">
-                {connected ? `Pay ${pot.entryFee} USDC & Start` : "Connect Wallet to Start"}
+              <Button 
+                onClick={handleAttempt} 
+                disabled={!connected || pot.isExpired} 
+                size="lg" 
+                className="w-full max-w-xs mx-auto bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg h-16"
+              >
+                {pot.isExpired ? "Pot Expired" : connected ? `Pay ${pot.entryFee} USDC & Start` : "Connect Wallet to Start"}
               </Button>
               
               {/* Show expire button if pot is expired but still active */}
