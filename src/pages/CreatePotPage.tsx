@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Wand2, Loader2, Terminal, Eye, EyeOff, Shuffle, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { Toaster, toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
@@ -38,8 +39,13 @@ export function CreatePotPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [amount, setAmount] = useState(0.01);
   const [duration, setDuration] = useState(1);
-  const [durationType, setDurationType] = useState<'days' | 'weeks' | 'months' | 'custom'>('days');
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+  const [durationType, setDurationType] = useState<'days' | 'weeks' | 'months' | 'custom'>('custom');
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(() => {
+    // Default to 5 hours from now
+    const defaultDate = new Date();
+    defaultDate.setHours(defaultDate.getHours() + 5);
+    return defaultDate;
+  });
   const [entryFee, setEntryFee] = useState(0.01);
   const [oneFaAddress, setOneFaAddress] = useState('');
   const [oneFaPrivateKey, setOneFaPrivateKey] = useState('');
@@ -102,7 +108,7 @@ export function CreatePotPage() {
       case 1:
         return amount > 0 && (durationType === 'custom' ? customEndDate && customEndDate > new Date() : duration > 0);
       case 2:
-        return !!oneFaPrivateKey;
+        return true; // 1FA private key is now optional
       case 3:
         return !!password && Object.keys(colorMap).length === MAPPABLE_DIRECTIONS.length;
       default:
@@ -143,9 +149,16 @@ export function CreatePotPage() {
       toast.error("Please connect your wallet first.");
       return;
     }
-    if (!oneFaAddress || !password || Object.keys(colorMap).length < MAPPABLE_DIRECTIONS.length) {
+    if (!password || Object.keys(colorMap).length < MAPPABLE_DIRECTIONS.length) {
       toast.error("Please complete all fields in the previous steps.");
       return;
+    }
+    
+    // Generate a default 1FA address if none was provided
+    let finalOneFaAddress = oneFaAddress;
+    if (!finalOneFaAddress) {
+      const defaultAccount = Account.generate();
+      finalOneFaAddress = defaultAccount.accountAddress.toString();
     }
     setIsSubmitting(true);
     const toastId = toast.loading("Submitting transaction to Aptos...");
@@ -164,7 +177,7 @@ export function CreatePotPage() {
             amountInOctas.toString(),
             durationInSeconds.toString(),
             entryFeeInOctas.toString(),
-            oneFaAddress,
+            finalOneFaAddress,
           ],
         },
       });
@@ -228,7 +241,7 @@ export function CreatePotPage() {
         potId: potId.toString(), 
         password, 
         legend: colorMap, 
-        oneFaAddress 
+        oneFaAddress: finalOneFaAddress 
       });
       
       // Fetch the created pot from blockchain
@@ -291,67 +304,112 @@ export function CreatePotPage() {
                           <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} placeholder="e.g., 1000" min="0.001" />
                         </div>
                         <div className="space-y-4">
-                          <Label>Duration</Label>
+                          <Label>Pot Expiration</Label>
                           <div className="space-y-3">
-                            <Select value={durationType} onValueChange={(value: 'days' | 'weeks' | 'months' | 'custom') => setDurationType(value)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select duration type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="days">Days</SelectItem>
-                                <SelectItem value="weeks">Weeks</SelectItem>
-                                <SelectItem value="months">Months</SelectItem>
-                                <SelectItem value="custom">Custom End Date</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            
-                            {durationType === 'custom' ? (
-                              <div className="space-y-2">
-                                <Label>End Date</Label>
+                            <div className="space-y-2">
+                              <Label>End Date & Time</Label>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <Button variant="outline" className="w-full justify-start text-left font-normal">
                                       <CalendarIcon className="mr-2 h-4 w-4" />
-                                      {customEndDate ? customEndDate.toLocaleDateString() : "Select end date"}
+                                      {customEndDate ? format(customEndDate, "PPP") : "Select date"}
                                     </Button>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-auto p-0" align="start">
                                     <Calendar
                                       mode="single"
                                       selected={customEndDate}
-                                      onSelect={setCustomEndDate}
+                                      onSelect={(date) => {
+                                        if (date) {
+                                          // Preserve the time when changing date
+                                          const newDate = new Date(date);
+                                          if (customEndDate) {
+                                            newDate.setHours(customEndDate.getHours());
+                                            newDate.setMinutes(customEndDate.getMinutes());
+                                          }
+                                          setCustomEndDate(newDate);
+                                        }
+                                      }}
                                       disabled={(date) => date < new Date()}
                                       initialFocus
                                     />
                                   </PopoverContent>
                                 </Popover>
-                                {customEndDate && (
+                                
+                                <div className="flex gap-2">
+                                  <Input
+                                    type="time"
+                                    value={customEndDate ? format(customEndDate, "HH:mm") : ""}
+                                    onChange={(e) => {
+                                      if (customEndDate && e.target.value) {
+                                        const [hours, minutes] = e.target.value.split(':');
+                                        const newDate = new Date(customEndDate);
+                                        newDate.setHours(parseInt(hours), parseInt(minutes));
+                                        setCustomEndDate(newDate);
+                                      }
+                                    }}
+                                    className="flex-1"
+                                  />
+                                </div>
+                              </div>
+                              
+                              {customEndDate && (
+                                <div className="space-y-1">
                                   <p className="text-sm text-muted-foreground">
-                                    Pot will expire on {customEndDate.toLocaleDateString()} at {customEndDate.toLocaleTimeString()}
+                                    Pot will expire on {format(customEndDate, "PPP 'at' p")}
                                   </p>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-2">
-                                <Label>Number of {durationType}</Label>
-                                <Slider 
-                                  value={[duration]} 
-                                  onValueChange={(val) => setDuration(val[0])} 
-                                  min={1} 
-                                  max={durationType === 'days' ? 365 : durationType === 'weeks' ? 52 : 12} 
-                                  step={1} 
-                                />
-                                <p className="text-sm text-muted-foreground">
-                                  {duration} {durationType} ({getDurationDisplay()})
-                                </p>
-                              </div>
-                            )}
+                                  <p className="text-xs text-muted-foreground">
+                                    Duration: {getDurationDisplay()}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                             
                             <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg">
                               <div className="flex items-center gap-2 text-sm">
                                 <Clock className="h-4 w-4" />
-                                <span className="font-medium">Total Duration:</span>
-                                <span>{getDurationDisplay()}</span>
+                                <span className="font-medium">Expiration:</span>
+                                <span>{customEndDate ? format(customEndDate, "PPP 'at' p") : "Not set"}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="text-xs text-muted-foreground">
+                              <p>💡 Quick presets:</p>
+                              <div className="flex gap-2 mt-1">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const date = new Date();
+                                    date.setHours(date.getHours() + 1);
+                                    setCustomEndDate(date);
+                                  }}
+                                >
+                                  1 hour
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const date = new Date();
+                                    date.setHours(date.getHours() + 5);
+                                    setCustomEndDate(date);
+                                  }}
+                                >
+                                  5 hours
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const date = new Date();
+                                    date.setHours(date.getHours() + 24);
+                                    setCustomEndDate(date);
+                                  }}
+                                >
+                                  1 day
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -363,7 +421,7 @@ export function CreatePotPage() {
                     <div>
                       <CardHeader>
                         <CardTitle className="font-display text-2xl">Step 2: Set the Rules</CardTitle>
-                        <CardDescription>Configure the entry fee and generate the unique key for this pot.</CardDescription>
+                        <CardDescription>Configure the entry fee and optionally generate a unique key for this pot.</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-6">
                         <div className="space-y-4">
@@ -388,10 +446,13 @@ export function CreatePotPage() {
                           <p className="text-sm text-muted-foreground">Recommended between 1/1000th and 1/100th of the pot amount.</p>
                         </div>
                         <div className="space-y-2">
-                          <Label>1FA Key Pair</Label>
+                          <Label>1FA Key Pair (Optional)</Label>
                           <Button variant="outline" onClick={generate1FA} className="w-full">
                             <Wand2 className="mr-2 h-4 w-4" /> Generate 1FA Key
                           </Button>
+                          <p className="text-sm text-muted-foreground">
+                            Optional: Generate a unique key pair for this pot. You can skip this step and continue.
+                          </p>
                           {oneFaPrivateKey && (
                             <>
                               <CopyableInput value={oneFaPrivateKey} />
@@ -444,7 +505,7 @@ export function CreatePotPage() {
                       <CardContent className="space-y-4">
                         <ul className="space-y-2 text-sm">
                           <li className="flex justify-between"><span>Pot Amount:</span> <span className="font-medium">${amount} USDC</span></li>
-                          <li className="flex justify-between"><span>Duration:</span> <span className="font-medium">{duration} days</span></li>
+                          <li className="flex justify-between"><span>Expires:</span> <span className="font-medium">{customEndDate ? format(customEndDate, "PPP 'at' p") : "Not set"}</span></li>
                           <li className="flex justify-between"><span>Entry Fee:</span> <span className="font-medium">${entryFee.toFixed(4)} USDC</span></li>
                           <li className="flex justify-between items-center">
                             <span>Password:</span>
@@ -466,9 +527,9 @@ export function CreatePotPage() {
                               </Button>
                             </div>
                           </li>
-                          <li className="flex justify-between"><span>1FA Address:</span> <span className="font-mono text-xs">{oneFaAddress ? `${oneFaAddress.slice(0,10)}...` : "Not generated"}</span></li>
+                          <li className="flex justify-between"><span>1FA Address:</span> <span className="font-mono text-xs">{oneFaAddress ? `${oneFaAddress.slice(0,10)}...` : "Will be auto-generated"}</span></li>
                         </ul>
-                        <Button onClick={handleCreatePot} disabled={isSubmitting || !connected || !oneFaAddress || !password || Object.keys(colorMap).length < MAPPABLE_DIRECTIONS.length} className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg py-6">
+                        <Button onClick={handleCreatePot} disabled={isSubmitting || !connected || !password || Object.keys(colorMap).length < MAPPABLE_DIRECTIONS.length} className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg py-6">
                           {isSubmitting ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : `Deposit ${amount} USDC & Create Pot`}
                         </Button>
                       </CardContent>
