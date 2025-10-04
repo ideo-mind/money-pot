@@ -34,6 +34,7 @@ interface PotState {
   addPot: (pot: Pot) => void;
   clearCache: () => void;
   expirePot: (potId: string) => Promise<boolean>;
+  expireAllPots: (potIds: string[]) => Promise<{ success: number; failed: number }>;
 }
 // Removed POT_TITLES array - using Pot #ID format instead
 export const transformToPot = (onChainPot: any): Pot => {
@@ -412,6 +413,39 @@ export const usePotStore = create<PotState>((set, get) => ({
       console.error('Failed to expire pot:', error);
       set({ loading: false, error: `Failed to expire pot: ${error.message}` });
       return false;
+    }
+  },
+  expireAllPots: async (potIds: string[]) => {
+    const state = get();
+    set({ loading: true, error: null });
+    
+    try {
+      let successCount = 0;
+      let failedCount = 0;
+      
+      // Update all pots in local state
+      set((state) => {
+        const updatedPots = { ...state.pots };
+        
+        potIds.forEach(potId => {
+          if (updatedPots[potId]) {
+            updatedPots[potId] = { ...updatedPots[potId], is_active: false, isExpired: true };
+            successCount++;
+          } else {
+            failedCount++;
+          }
+        });
+        
+        savePotsToStorage(updatedPots);
+        return { pots: updatedPots, sortedPots: sortPots(updatedPots), loading: false };
+      });
+      
+      console.log(`Successfully expired ${successCount} pots, ${failedCount} failed`);
+      return { success: successCount, failed: failedCount };
+    } catch (error) {
+      console.error('Failed to expire pots:', error);
+      set({ loading: false, error: `Failed to expire pots: ${error.message}` });
+      return { success: 0, failed: potIds.length };
     }
   },
 }));

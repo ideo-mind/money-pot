@@ -3,12 +3,16 @@ import { PotCard } from "@/components/PotCard";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePotStore } from "@/store/pot-store";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
-import { PartyPopper, ShieldClose, Trophy, Package, Target } from "lucide-react";
+import { PartyPopper, ShieldClose, Trophy, Package, Target, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 const StatCard = ({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -21,11 +25,13 @@ const StatCard = ({ title, value, icon: Icon }: { title: string, value: string |
   </Card>
 );
 export function DashboardPage() {
-  const { account, connected } = useWallet();
+  const { account, connected, signAndSubmitTransaction } = useWallet();
   const allPots = usePotStore((state) => state.sortedPots);
   const attempts = usePotStore((state) => state.attempts);
   const loading = usePotStore((state) => state.loading);
   const fetchPots = usePotStore((state) => state.fetchPots);
+  const expireAllPots = usePotStore((state) => state.expireAllPots);
+  const [isExpiringAll, setIsExpiringAll] = useState(false);
   useEffect(() => {
     if (connected) {
       fetchPots();
@@ -35,6 +41,66 @@ export function DashboardPage() {
     if (!account) return [];
     return allPots.filter(pot => pot.creator === account.address.toString());
   }, [allPots, account]);
+
+  const handleExpireAllPots = async () => {
+    if (!connected || !account) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+
+    const activePots = myCreatedPots.filter(pot => pot.is_active && !pot.isExpired);
+    if (activePots.length === 0) {
+      toast.info("No active pots to expire");
+      return;
+    }
+
+    setIsExpiringAll(true);
+    try {
+      let successCount = 0;
+      let failedCount = 0;
+
+      // Process each pot individually
+      for (const pot of activePots) {
+        try {
+          // Submit blockchain transaction
+          const response = await signAndSubmitTransaction({
+            sender: account.address,
+            data: {
+              function: `${MODULE_ADDRESS}::${MODULE_NAME}::expire_pot`,
+              typeArguments: [],
+              functionArguments: [BigInt(pot.id).toString()],
+            },
+          });
+
+          // Wait for transaction to complete
+          await aptos.waitForTransaction({
+            transactionHash: response.hash,
+          });
+
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to expire pot ${pot.id}:`, error);
+          failedCount++;
+        }
+      }
+
+      // Update local state for all pots
+      const potIds = activePots.map(pot => pot.id);
+      await expireAllPots(potIds);
+
+      if (successCount > 0) {
+        toast.success(`Successfully expired ${successCount} pot${successCount > 1 ? 's' : ''}!`);
+      }
+      if (failedCount > 0) {
+        toast.error(`Failed to expire ${failedCount} pot${failedCount > 1 ? 's' : ''}`);
+      }
+    } catch (error) {
+      console.error('Failed to expire all pots:', error);
+      toast.error("Failed to expire pots");
+    } finally {
+      setIsExpiringAll(false);
+    }
+  };
   const stats = useMemo(() => {
     const wins = attempts.filter(a => a.status === 'won').length;
     const totalAttempts = attempts.length;
@@ -74,6 +140,53 @@ export function DashboardPage() {
           <TabsTrigger value="attempts">My Attempts</TabsTrigger>
         </TabsList>
         <TabsContent value="created" className="mt-8">
+          {myCreatedPots.length > 0 && (
+            <div className="mb-6 flex justify-between items-center">
+              <h3 className="text-lg font-semibold">My Created Pots ({myCreatedPots.length})</h3>
+              {myCreatedPots.some(pot => pot.is_active && !pot.isExpired) && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      disabled={isExpiringAll}
+                      className="bg-red-500 hover:bg-red-600"
+                    >
+                      {isExpiringAll ? (
+                        <>
+                          <XCircle className="mr-2 h-4 w-4 animate-spin" />
+                          Expiring All...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Expire All Pots
+                        </>
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Expire All Active Pots</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will expire all your active pots. This action cannot be undone.
+                        You will need to confirm each transaction in your wallet.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleExpireAllPots}
+                        className="bg-red-500 hover:bg-red-600"
+                      >
+                        Expire All Pots
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {loading && Array.from({ length: 3 }).map((_, i) => <PotCardSkeleton key={i} />)}
             {!loading && myCreatedPots.length === 0 && (
