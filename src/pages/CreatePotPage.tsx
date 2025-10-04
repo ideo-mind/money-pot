@@ -36,6 +36,7 @@ const steps = [
 export function CreatePotPage() {
   const { signAndSubmitTransaction, connected, account } = useWallet();
   const addPot = usePotStore((state) => state.addPot);
+  const fetchPots = usePotStore((state) => state.fetchPots);
   const { addTransaction, updateTransaction } = useTransactionStore();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
@@ -266,6 +267,9 @@ export function CreatePotPage() {
       
       const newPot = transformToPot(potData);
       addPot(newPot);
+      
+      // Refresh the pots list to get the latest pot IDs and ensure new pot appears at top
+      await fetchPots(true);
       
       // Update transaction as successful
       updateTransaction(txId, { 

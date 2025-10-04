@@ -26,7 +26,7 @@ interface PotState {
   hasMorePots: boolean;
   currentBatch: number;
   totalPots: number;
-  fetchPots: () => Promise<void>;
+  fetchPots: (forceRefresh?: boolean) => Promise<void>;
   fetchNextBatch: () => Promise<void>;
   fetchPotById: (id: string) => Promise<void>;
   getPotById: (id: string) => Pot | undefined;
@@ -182,13 +182,13 @@ export const usePotStore = create<PotState>((set, get) => ({
   hasMorePots: true,
   currentBatch: 0,
   totalPots: 0,
-  fetchPots: async () => {
+  fetchPots: async (forceRefresh = false) => {
     const state = get();
     const metadata = loadMetadataFromStorage();
     const now = Date.now();
     
-    // Check if we have cached data and it's recent (less than 5 minutes old)
-    if (metadata && Object.keys(state.pots).length > 0 && (now - metadata.lastFetch) < 5 * 60 * 1000) {
+    // Check if we have cached data and it's recent (less than 5 minutes old) and not forcing refresh
+    if (!forceRefresh && metadata && Object.keys(state.pots).length > 0 && (now - metadata.lastFetch) < 5 * 60 * 1000) {
       console.log("Using cached pots data (newest first)");
       set({ 
         totalPots: metadata.totalPots,
