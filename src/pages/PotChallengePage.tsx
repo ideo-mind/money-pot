@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Account } from "@aptos-labs/ts-sdk";
 import { getOneFaKey, storeOneFaKey } from "@/lib/oneFaStorage";
 import { useTransactionStore } from "@/store/transaction-store";
+import { AuthenticationDisplay } from "@/components/AuthenticationDisplay";
 type GameState = "idle" | "paying" | "fetching_challenge" | "playing" | "verifying" | "won" | "lost";
 type KeyState = "unchecked" | "validating" | "valid" | "invalid";
 export function PotChallengePage() {
@@ -495,124 +496,6 @@ export function PotChallengePage() {
     console.log("Current challenge structure:", currentChallenge);
   }
 
-  // Tetris-like Challenge Component - Wall with Color Sections
-  const TetrisChallenge = ({ challenge }: { challenge: any }) => {
-    const getColorClass = (color: string) => {
-      switch (color?.toLowerCase()) {
-        case 'red': return 'bg-red-500 shadow-red-500/50';
-        case 'green': return 'bg-green-500 shadow-green-500/50';
-        case 'blue': return 'bg-blue-500 shadow-blue-500/50';
-        case 'yellow': return 'bg-yellow-500 shadow-yellow-500/50';
-        default: return 'bg-gray-500 shadow-gray-500/50';
-      }
-    };
-
-    const getDirectionColor = (direction: string) => {
-      switch (direction) {
-        case 'U': return 'bg-red-100 border-red-500 text-red-700';
-        case 'D': return 'bg-green-100 border-green-500 text-green-700';
-        case 'L': return 'bg-blue-100 border-blue-500 text-blue-700';
-        case 'R': return 'bg-yellow-100 border-yellow-500 text-yellow-700';
-        case 'S': return 'bg-gray-100 border-gray-500 text-gray-700';
-        default: return 'bg-gray-100 border-gray-300 text-gray-600';
-      }
-    };
-
-    if (challenge.colorGroups && challenge.grid) {
-      // Display just the current challenge with organized color sections
-      const gridChars = challenge.grid.split('');
-      
-      // Group characters by color
-      const colorGroups: {[key: string]: string[]} = {
-        red: [],
-        green: [],
-        blue: [],
-        yellow: []
-      };
-      
-      // Distribute characters into their color groups
-      gridChars.forEach((char: string) => {
-        Object.entries(challenge.colorGroups).forEach(([color, chars]: [string, any]) => {
-          if (chars.includes(char)) {
-            colorGroups[color].push(char);
-          }
-        });
-      });
-
-      return (
-        <div className="space-y-4">
-          {/* Simple single grid with color backgrounds */}
-          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg max-w-3xl mx-auto">
-            <div className="grid grid-cols-8 gap-1">
-              {gridChars.map((char, index) => {
-                // Find which color group this character belongs to
-                let charColor = 'gray';
-                Object.entries(challenge.colorGroups).forEach(([color, chars]: [string, any]) => {
-                  if (chars.includes(char)) {
-                    charColor = color;
-                  }
-                });
-                
-                return (
-                  <div 
-                    key={index} 
-                    className={`aspect-square rounded-sm flex items-center justify-center text-white font-bold text-lg ${getColorClass(charColor)}`}
-                  >
-                    {char}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (challenge.grid && typeof challenge.grid === 'string' && !challenge.colorGroups) {
-      // Handle string-based grid format without colorGroups (fallback)
-      const gridChars = challenge.grid.split('');
-      
-      return (
-        <div className="space-y-6">
-          <div className="text-center">
-            <h3 className="text-2xl font-bold mb-2">Find the character in the grid below</h3>
-            <p className="text-sm text-muted-foreground mt-2">
-              Choose the direction based on the character's color section
-            </p>
-          </div>
-          
-          {/* Simple grid display */}
-          <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-4xl mx-auto">
-            <div className="grid grid-cols-8 gap-1">
-              {gridChars.map((char, index) => (
-                <div 
-                  key={index} 
-                  className="aspect-square bg-gray-500 rounded-sm flex items-center justify-center text-white font-bold text-sm shadow-sm transform transition-all duration-200 hover:scale-110"
-                >
-                  {char}
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          {/* Character count info */}
-          <div className="text-center text-xs text-muted-foreground">
-            Showing {gridChars.length} characters
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="text-center p-8">
-        <p className="text-lg text-muted-foreground mb-4">Challenge data received:</p>
-        <pre className="text-xs bg-gray-100 p-4 rounded overflow-auto max-h-64">
-          {JSON.stringify(challenge, null, 2)}
-        </pre>
-      </div>
-    );
-  };
-
   return (
     <div className="max-w-5xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
       <Toaster richColors position="top-right" />
@@ -731,18 +614,11 @@ export function PotChallengePage() {
             </div>
           </div>
 
-          {/* Tetris-like Challenge Display with Transition Animation */}
-          <Card className={`bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-brand-green/20 shadow-2xl transition-all duration-500 ${
-            isTransitioning ? 'opacity-50 scale-95' : 'opacity-100 scale-100'
-          }`}>
-            <CardContent className="p-8">
-              <div className={`transition-all duration-500 ${
-                isTransitioning ? 'transform translate-y-4 opacity-0' : 'transform translate-y-0 opacity-100'
-              }`}>
-                <TetrisChallenge challenge={currentChallenge} />
-              </div>
-            </CardContent>
-          </Card>
+          {/* Enhanced Authentication Display with Multiple Layouts */}
+          <AuthenticationDisplay
+            challenge={currentChallenge}
+            isTransitioning={isTransitioning}
+          />
 
           {/* Direction Controls */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
