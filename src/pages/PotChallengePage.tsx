@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Account, PrivateKey } from "@aptos-labs/ts-sdk";
 import { getOneFaKey, storeOneFaKey } from "@/lib/oneFaStorage";
+import { useTransactionStore } from "@/store/transaction-store";
 type GameState = "idle" | "paying" | "fetching_challenge" | "playing" | "verifying" | "won" | "lost";
 type KeyState = "unchecked" | "validating" | "valid" | "invalid";
 export function PotChallengePage() {
@@ -26,10 +27,13 @@ export function PotChallengePage() {
   const error = usePotStore((state) => state.error);
   const fetchPotById = usePotStore((state) => state.fetchPotById);
   const addAttempt = usePotStore((state) => state.addAttempt);
+  const expirePot = usePotStore((state) => state.expirePot);
+  const { addTransaction, updateTransaction } = useTransactionStore();
   const [gameState, setGameState] = useState<GameState>("idle");
   const [oneFaPrivateKey, setOneFaPrivateKey] = useState("");
   const [keyState, setKeyState] = useState<KeyState>("unchecked");
   const [isAutoCompleted, setIsAutoCompleted] = useState(false);
+  const [isExpiring, setIsExpiring] = useState(false);
   const [challenges, setChallenges] = useState<any[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
   const [solutions, setSolutions] = useState<string[]>([]);
@@ -89,6 +93,17 @@ export function PotChallengePage() {
     if (!connected || !pot || keyState !== 'valid') return;
     setGameState("paying");
     const toastId = toast.loading("Submitting entry fee transaction...");
+    
+    // Add transaction to log
+    const txId = addTransaction({
+      hash: '', // Will be updated when we get the response
+      type: 'attempt_pot',
+      status: 'pending',
+      description: `Attempting Pot #${pot.id}`,
+      potId: pot.id,
+      amount: `${pot.entryFee} USDC`,
+    });
+    
     try {
       // Use wallet adapter to sign and submit transaction
       const response = await signAndSubmitTransaction({
@@ -99,6 +114,9 @@ export function PotChallengePage() {
           functionArguments: [BigInt(pot.id).toString()],
         },
       });
+      
+      // Update transaction with hash
+      updateTransaction(txId, { hash: response.hash });
       
       // Wait for transaction to complete
       const result = await aptos.waitForTransaction({
@@ -142,7 +160,19 @@ export function PotChallengePage() {
       const { challenges: fetchedChallenges } = await getAuthOptions(attemptId.toString());
       setChallenges(fetchedChallenges.slice(0, pot.difficulty));
       setGameState("playing");
+      
+      // Update transaction as successful
+      updateTransaction(txId, { 
+        status: 'success',
+        description: `Successfully paid entry fee for Pot #${pot.id}`
+      });
     } catch (error) {
+      // Update transaction as failed
+      updateTransaction(txId, { 
+        status: 'failed', 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
       toast.error("Failed to pay entry fee.", { id: toastId, description: (error as Error).message });
       setGameState("idle");
     }
@@ -186,6 +216,79 @@ export function PotChallengePage() {
       }
     }
   };
+
+  const handleExpirePot = async () => {
+    if (!pot || !connected || !account) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+    
+    setIsExpiring(true);
+    
+    // Add transaction to log
+    const txId = addTransaction({
+      hash: '', // Will be updated when we get the response
+      type: 'expire_pot',
+      status: 'pending',
+      description: `Expiring Pot #${pot.id}`,
+      potId: pot.id,
+    });
+    
+    try {
+      // Submit blockchain transaction
+      const response = await signAndSubmitTransaction({
+        sender: account.address,
+        data: {
+          function: `${MODULE_ADDRESS}::${MODULE_NAME}::expire_pot`,
+          typeArguments: [],
+          functionArguments: [BigInt(pot.id).toString()],
+        },
+      });
+      
+      // Update transaction with hash
+      updateTransaction(txId, { hash: response.hash });
+      
+      // Wait for transaction to complete
+      await aptos.waitForTransaction({
+        transactionHash: response.hash,
+      });
+      
+      // Update local state
+      const success = await expirePot(pot.id);
+      if (success) {
+        // Update transaction as successful
+        updateTransaction(txId, { 
+          status: 'success',
+          description: `Successfully expired Pot #${pot.id}`
+        });
+        
+        toast.success("Pot expired successfully!");
+        // Refresh the pot data
+        await fetchPotById(pot.id);
+      } else {
+        // Update transaction as failed
+        updateTransaction(txId, { 
+          status: 'failed', 
+          error: 'Failed to update local state'
+        });
+        
+        toast.error("Failed to expire pot");
+      }
+    } catch (error) {
+      console.error('Failed to expire pot:', error);
+      
+      // Update transaction as failed
+      updateTransaction(txId, { 
+        status: 'failed', 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      toast.error("Failed to expire pot");
+    } finally {
+      setIsExpiring(false);
+    }
+  };
+
   const KeyIcon = useMemo(() => {
     switch (keyState) {
       case "validating": return <Loader2 className="h-4 w-4 animate-spin" />;
@@ -245,9 +348,39 @@ export function PotChallengePage() {
               </div>
             </div>
             <p className="text-lg">Pay the entry fee of <span className="font-bold text-brand-gold">{pot.entryFee} USDC</span> to begin.</p>
-            <Button onClick={handleAttempt} disabled={!connected || keyState !== 'valid'} size="lg" className="w-full max-w-xs mx-auto bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg h-16">
-              {connected ? `Pay ${pot.entryFee} USDC & Start` : "Connect Wallet to Start"}
-            </Button>
+            <div className="space-y-3">
+              <Button onClick={handleAttempt} disabled={!connected || keyState !== 'valid'} size="lg" className="w-full max-w-xs mx-auto bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg h-16">
+                {connected ? `Pay ${pot.entryFee} USDC & Start` : "Connect Wallet to Start"}
+              </Button>
+              
+              {/* Show expire button if pot is expired but still active */}
+              {pot.isExpired && pot.is_active && (
+                <div className="text-center">
+                  <Button 
+                    onClick={handleExpirePot}
+                    disabled={isExpiring}
+                    variant="destructive"
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600"
+                  >
+                    {isExpiring ? (
+                      <>
+                        <XCircle className="mr-2 h-4 w-4 animate-spin" />
+                        Expiring...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Expire Pot
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This pot has timed out but is still active
+                  </p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

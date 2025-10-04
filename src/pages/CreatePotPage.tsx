@@ -25,6 +25,7 @@ import { ColorDirectionMapper } from "@/components/ColorDirectionMapper";
 import { CharacterSelector } from "@/components/CharacterSelector";
 import { SuccessAnimation } from "@/components/SuccessAnimation";
 import { usePotStore, transformToPot } from "@/store/pot-store";
+import { useTransactionStore } from "@/store/transaction-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 const steps = [
   { id: 1, name: "Define Pot" },
@@ -35,9 +36,10 @@ const steps = [
 export function CreatePotPage() {
   const { signAndSubmitTransaction, connected, account } = useWallet();
   const addPot = usePotStore((state) => state.addPot);
+  const { addTransaction, updateTransaction } = useTransactionStore();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
-  const [amount, setAmount] = useState(0.01);
+  const [amount, setAmount] = useState(1);
   const [duration, setDuration] = useState(1);
   const [durationType, setDurationType] = useState<'days' | 'weeks' | 'months' | 'custom'>('custom');
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(() => {
@@ -162,6 +164,16 @@ export function CreatePotPage() {
     }
     setIsSubmitting(true);
     const toastId = toast.loading("Submitting transaction to Aptos...");
+    
+    // Add transaction to log
+    const txId = addTransaction({
+      hash: '', // Will be updated when we get the response
+      type: 'create_pot',
+      status: 'pending',
+      description: `Creating pot with ${amount} USDC`,
+      amount: `${amount} USDC`,
+    });
+    
     try {
       const amountInOctas = BigInt(Math.floor(amount * 1_000_000));
       const entryFeeInOctas = BigInt(Math.floor(entryFee * 1_000_000));
@@ -181,6 +193,9 @@ export function CreatePotPage() {
           ],
         },
       });
+      
+      // Update transaction with hash
+      updateTransaction(txId, { hash: response.hash });
       
       // Wait for transaction to complete
       const result = await aptos.waitForTransaction({
@@ -252,11 +267,24 @@ export function CreatePotPage() {
       const newPot = transformToPot(potData);
       addPot(newPot);
       
+      // Update transaction as successful
+      updateTransaction(txId, { 
+        status: 'success', 
+        potId: potId.toString(),
+        description: `Successfully created Pot #${potId} with ${amount} USDC`
+      });
+      
       toast.dismiss(toastId);
       setCreationSuccess(true);
       setTimeout(() => navigate("/pots"), 3000);
     } catch (error) {
       console.error("Pot creation failed:", error);
+      
+      // Update transaction as failed
+      updateTransaction(txId, { 
+        status: 'failed', 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       toast.error("Pot creation failed.", { id: toastId, description: (error as Error).message });
     } finally {
       setIsSubmitting(false);

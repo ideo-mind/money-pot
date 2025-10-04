@@ -1,6 +1,7 @@
 import { Link, Outlet } from "react-router-dom";
 import { WalletConnectButton } from "./WalletConnectButton";
 import { UserBalance } from "./UserBalance";
+import { TransactionLog } from "./TransactionLog";
 export function Layout() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100">
@@ -42,6 +43,7 @@ export function Layout() {
           <p>© 2025 Money Pot. All rights reserved.</p>
         </div>
       </footer>
+      <TransactionLog />
     </div>
   );
 }

@@ -32,6 +32,7 @@ interface PotState {
   addAttempt: (attempt: Attempt) => void;
   addPot: (pot: Pot) => void;
   clearCache: () => void;
+  expirePot: (potId: string) => Promise<boolean>;
 }
 // Removed POT_TITLES array - using Pot #ID format instead
 export const transformToPot = (onChainPot: any): Pot => {
@@ -367,5 +368,33 @@ export const usePotStore = create<PotState>((set, get) => ({
       currentBatch: 0, 
       totalPots: 0 
     });
+  },
+  expirePot: async (potId: string) => {
+    const state = get();
+    set({ loading: true, error: null });
+    
+    try {
+      // This function should be called from a component with wallet access
+      // For now, we'll just update the local state
+      // The actual blockchain transaction should be handled in the component
+      
+      // Update the pot in local state
+      set((state) => {
+        const updatedPots = state.pots.map(pot => 
+          pot.id === potId 
+            ? { ...pot, is_active: false, isExpired: true }
+            : pot
+        );
+        savePotsToStorage(updatedPots);
+        return { pots: updatedPots, loading: false };
+      });
+      
+      console.log(`Successfully expired pot ${potId}`);
+      return true;
+    } catch (error) {
+      console.error('Failed to expire pot:', error);
+      set({ loading: false, error: `Failed to expire pot: ${error.message}` });
+      return false;
+    }
   },
 }));

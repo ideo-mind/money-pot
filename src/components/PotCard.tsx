@@ -4,14 +4,63 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Clock, DollarSign, Gem, Shield } from "lucide-react";
+import { Clock, DollarSign, Gem, Shield, XCircle } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
+import { usePotStore } from "@/store/pot-store";
+import { useState } from "react";
+import { toast } from "sonner";
+import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 interface PotCardProps {
   pot: Pot;
 }
 export function PotCard({ pot }: PotCardProps) {
   const isHot = parseInt(pot.attempts_count) > 10;
+  const expirePot = usePotStore((state) => state.expirePot);
+  const [isExpiring, setIsExpiring] = useState(false);
+  const { signAndSubmitTransaction, connected, account } = useWallet();
+  
+  const handleExpirePot = async () => {
+    if (!connected || !account) {
+      toast.error("Please connect your wallet first");
+      return;
+    }
+    
+    setIsExpiring(true);
+    try {
+      // Submit blockchain transaction
+      const response = await signAndSubmitTransaction({
+        sender: account.address,
+        data: {
+          function: `${MODULE_ADDRESS}::${MODULE_NAME}::expire_pot`,
+          typeArguments: [],
+          functionArguments: [BigInt(pot.id).toString()],
+        },
+      });
+      
+      // Wait for transaction to complete
+      await aptos.waitForTransaction({
+        transactionHash: response.hash,
+      });
+      
+      // Update local state
+      const success = await expirePot(pot.id);
+      if (success) {
+        toast.success("Pot expired successfully!");
+      } else {
+        toast.error("Failed to expire pot");
+      }
+    } catch (error) {
+      console.error('Failed to expire pot:', error);
+      toast.error("Failed to expire pot");
+    } finally {
+      setIsExpiring(false);
+    }
+  };
+  
+  // Show expire button if pot is expired but still active (timed out but not manually expired)
+  const shouldShowExpireButton = pot.isExpired && pot.is_active;
   return (
     <motion.div
       whileHover={{ y: -5, scale: 1.02 }}
@@ -73,11 +122,36 @@ export function PotCard({ pot }: PotCardProps) {
           </div>
         </CardContent>
         <CardFooter className="p-4 bg-slate-50 dark:bg-slate-900/50">
-          <Button asChild className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold" disabled={pot.isExpired}>
-            <Link to={`/pots/${pot.id}`}>
-              {pot.isExpired ? "Expired" : `Attempt for $${pot.entryFee.toLocaleString()}`}
-            </Link>
-          </Button>
+          {shouldShowExpireButton ? (
+            <div className="w-full space-y-2">
+              <Button 
+                onClick={handleExpirePot}
+                disabled={isExpiring}
+                className="w-full bg-red-500 hover:bg-red-600 text-white font-bold"
+              >
+                {isExpiring ? (
+                  <>
+                    <XCircle className="mr-2 h-4 w-4 animate-spin" />
+                    Expiring...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Expire Pot
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-center text-muted-foreground">
+                This pot has timed out but is still active. Click to manually expire it.
+              </p>
+            </div>
+          ) : (
+            <Button asChild className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold" disabled={pot.isExpired}>
+              <Link to={`/pots/${pot.id}`}>
+                {pot.isExpired ? "Expired" : `Attempt for $${pot.entryFee.toLocaleString()}`}
+              </Link>
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </motion.div>

@@ -32,3 +32,15 @@ export interface LeaderboardUser {
   username: string;
   amount: number;
 }
+
+export interface Transaction {
+  id: string;
+  hash: string;
+  type: 'create_pot' | 'attempt_pot' | 'expire_pot';
+  status: 'pending' | 'success' | 'failed';
+  timestamp: number;
+  description: string;
+  potId?: string;
+  amount?: string;
+  error?: string;
+}
