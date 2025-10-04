@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 export function PotsListPage() {
-  const pots = usePotStore((state) => state.pots);
+  const pots = usePotStore((state) => state.sortedPots);
   const loading = usePotStore((state) => state.loading);
   const error = usePotStore((state) => state.error);
   const hasMorePots = usePotStore((state) => state.hasMorePots);
@@ -21,7 +21,7 @@ export function PotsListPage() {
     <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-16">
         <h1 className="text-4xl md:text-5xl font-display font-bold">Money Pots</h1>
-        <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">Browse all available treasure hunts, newest first. May the sharpest mind win.</p>
+        <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">Browse all available treasure hunts, active pots first, then newest first. May the sharpest mind win.</p>
       </div>
       {error && (
         <div className="text-center mb-8">
@@ -41,7 +41,7 @@ export function PotsListPage() {
           </div>
         </div>
       )}
-      {!loading && !error && Object.keys(pots).length === 0 && (
+      {!loading && !error && pots.length === 0 && (
         <div className="text-center py-16">
           <div className="text-6xl mb-4">🏺</div>
           <h3 className="text-2xl font-display font-bold mb-2">No Pots Available</h3>
@@ -73,7 +73,7 @@ export function PotsListPage() {
               Loading pots in batches of 10 every 100 seconds
             </p>
             <p className="text-sm text-green-500 dark:text-green-500 mt-2">
-              Showing {Object.keys(pots).length} of {totalPots} pots
+              Showing {pots.length} of {totalPots} pots
               {hasMorePots && ` • Next batch in ${Math.max(0, 100 - ((Date.now() - (currentBatch * 100000)) / 1000))}s`}
             </p>
             <div className="mt-3 space-x-2">
@@ -100,7 +100,7 @@ export function PotsListPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {loading
           ? Array.from({ length: 6 }).map((_, i) => <PotCardSkeleton key={i} />)
-          : Object.values(pots).map((pot) => (
+          : pots.map((pot) => (
               <PotCard key={pot.id} pot={pot} />
             ))}
       </div>

@@ -7,13 +7,13 @@ import { ArrowRight, BrainCircuit, Lock } from "lucide-react";
 import { useEffect } from "react";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
 export function HomePage() {
-  const pots = usePotStore((state) => state.pots);
+  const pots = usePotStore((state) => state.sortedPots);
   const loading = usePotStore((state) => state.loading);
   const fetchPots = usePotStore((state) => state.fetchPots);
   useEffect(() => {
     fetchPots();
   }, [fetchPots]);
-  const featuredPots = Object.values(pots).slice(0, 3);
+  const featuredPots = pots.slice(0, 3);
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {

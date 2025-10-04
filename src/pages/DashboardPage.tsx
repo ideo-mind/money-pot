@@ -22,7 +22,7 @@ const StatCard = ({ title, value, icon: Icon }: { title: string, value: string |
 );
 export function DashboardPage() {
   const { account, connected } = useWallet();
-  const allPots = usePotStore((state) => state.pots);
+  const allPots = usePotStore((state) => state.sortedPots);
   const attempts = usePotStore((state) => state.attempts);
   const loading = usePotStore((state) => state.loading);
   const fetchPots = usePotStore((state) => state.fetchPots);
@@ -33,7 +33,7 @@ export function DashboardPage() {
   }, [connected, fetchPots]);
   const myCreatedPots = useMemo(() => {
     if (!account) return [];
-    return Object.values(allPots).filter(pot => pot.creator === account.address.toString());
+    return allPots.filter(pot => pot.creator === account.address.toString());
   }, [allPots, account]);
   const stats = useMemo(() => {
     const wins = attempts.filter(a => a.status === 'won').length;

@@ -18,6 +18,7 @@ interface PotMetadata {
 
 interface PotState {
   pots: Record<string, Pot>; // Changed from array to object for better performance
+  sortedPots: Pot[]; // Memoized sorted pots to prevent infinite re-renders
   currentPot: Pot | null;
   attempts: Attempt[];
   loading: boolean;
@@ -119,6 +120,17 @@ const loadPotsFromStorage = (): Record<string, Pot> => {
   }
 };
 
+const sortPots = (pots: Record<string, Pot>): Pot[] => {
+  return Object.values(pots).sort((a, b) => {
+    // First priority: Active pots come first
+    if (a.is_active !== b.is_active) {
+      return a.is_active ? -1 : 1;
+    }
+    // Second priority: Sort by ID in descending order (latest first)
+    return parseInt(b.id) - parseInt(a.id);
+  });
+};
+
 const loadMetadataFromStorage = (): PotMetadata | null => {
   try {
     const storedMetadata = localStorage.getItem(POTS_METADATA_KEY);
@@ -159,8 +171,10 @@ const saveMetadataToStorage = (metadata: PotMetadata) => {
     console.error("Failed to save metadata to local storage:", error);
   }
 };
+const initialPots = loadPotsFromStorage();
 export const usePotStore = create<PotState>((set, get) => ({
-  pots: loadPotsFromStorage(), // Load cached pots
+  pots: initialPots, // Load cached pots
+  sortedPots: sortPots(initialPots), // Initialize sorted pots
   currentPot: null,
   attempts: loadAttemptsFromStorage(),
   loading: false,
@@ -179,7 +193,8 @@ export const usePotStore = create<PotState>((set, get) => ({
       set({ 
         totalPots: metadata.totalPots,
         hasMorePots: metadata.fetchedPots < metadata.totalPots,
-        currentBatch: Math.floor(metadata.fetchedPots / 10)
+        currentBatch: Math.floor(metadata.fetchedPots / 10),
+        sortedPots: sortPots(state.pots)
       });
       return;
     }
@@ -190,7 +205,7 @@ export const usePotStore = create<PotState>((set, get) => ({
       const [potIds] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPots(aptos);
       
       if (potIds.length === 0) {
-        set({ pots: {}, loading: false, totalPots: 0, hasMorePots: false });
+        set({ pots: {}, sortedPots: [], loading: false, totalPots: 0, hasMorePots: false });
         savePotsToStorage({});
         saveMetadataToStorage({
           lastFetch: now,
@@ -293,6 +308,7 @@ export const usePotStore = create<PotState>((set, get) => ({
     
     set({
       pots: updatedPots,
+      sortedPots: sortPots(updatedPots),
       currentBatch: state.currentBatch + 1,
       hasMorePots: hasMore
     });
@@ -357,7 +373,7 @@ export const usePotStore = create<PotState>((set, get) => ({
     set((state) => {
       const newPots = { ...state.pots, [pot.id]: pot };
       savePotsToStorage(newPots);
-      return { pots: newPots };
+      return { pots: newPots, sortedPots: sortPots(newPots) };
     });
   },
   clearCache: () => {
@@ -365,6 +381,7 @@ export const usePotStore = create<PotState>((set, get) => ({
     localStorage.removeItem(POTS_METADATA_KEY);
     set({ 
       pots: {}, 
+      sortedPots: [],
       hasMorePots: true, 
       currentBatch: 0, 
       totalPots: 0 
@@ -386,7 +403,7 @@ export const usePotStore = create<PotState>((set, get) => ({
           updatedPots[potId] = { ...updatedPots[potId], is_active: false, isExpired: true };
         }
         savePotsToStorage(updatedPots);
-        return { pots: updatedPots, loading: false };
+        return { pots: updatedPots, sortedPots: sortPots(updatedPots), loading: false };
       });
       
       console.log(`Successfully expired pot ${potId}`);
