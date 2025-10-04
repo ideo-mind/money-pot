@@ -445,7 +445,7 @@ export function PotChallengePage() {
     console.log("Current challenge structure:", currentChallenge);
   }
 
-  // Tetris-like Challenge Component
+  // Tetris-like Challenge Component - Wall with Color Sections
   const TetrisChallenge = ({ challenge }: { challenge: any }) => {
     const getColorClass = (color: string) => {
       switch (color?.toLowerCase()) {
@@ -469,59 +469,163 @@ export function PotChallengePage() {
     };
 
     if (challenge.colorGroups) {
+      // Create a comprehensive giant wall with ALL characters from ALL challenges
+      const allChars: Array<{char: string, color: string}> = [];
+      
+      // Collect ALL characters from ALL color groups in ALL challenges
+      challenges.forEach((challengeItem: any) => {
+        if (challengeItem.colorGroups) {
+          Object.entries(challengeItem.colorGroups).forEach(([color, chars]: [string, any]) => {
+            const charsArray = Array.isArray(chars) ? chars : [chars];
+            charsArray.forEach((char: string) => {
+              allChars.push({ char, color });
+            });
+          });
+        }
+      });
+
+      // If no characters from other challenges, use current challenge
+      if (allChars.length === 0) {
+        Object.entries(challenge.colorGroups).forEach(([color, chars]: [string, any]) => {
+          const charsArray = Array.isArray(chars) ? chars : [chars];
+          charsArray.forEach((char: string) => {
+            allChars.push({ char, color });
+          });
+        });
+      }
+
+      // Create a proper wall layout - calculate optimal grid size for ALL characters
+      const totalChars = allChars.length;
+      const cols = Math.max(12, Math.ceil(Math.sqrt(totalChars * 1.5))); // Wider grid, minimum 12 columns
+      const rows = Math.ceil(totalChars / cols);
+
+      // Distribute characters across the grid
+      const wallGrid: Array<{char: string, color: string} | null>[] = [];
+      for (let row = 0; row < rows; row++) {
+        const rowChars: Array<{char: string, color: string} | null> = [];
+        for (let col = 0; col < cols; col++) {
+          const index = row * cols + col;
+          rowChars.push(index < allChars.length ? allChars[index] : null);
+        }
+        wallGrid.push(rowChars);
+      }
+
       return (
         <div className="space-y-6">
           <div className="text-center">
             <h3 className="text-2xl font-bold mb-2">Find the character:</h3>
-            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse">
+            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse drop-shadow-lg">
               {challenge.targetChar || challenge.target_char || '?'}
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Look for the character in the wall below and choose the direction based on its color section
+            </p>
+          </div>
+          
+          {/* Comprehensive giant wall with ALL characters from ALL challenges */}
+          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-7xl mx-auto overflow-x-auto">
+            <div className="space-y-1 min-w-max">
+              {wallGrid.map((row, rowIndex) => (
+                <div key={rowIndex} className="flex justify-center gap-1">
+                  {row.map((item, index) => (
+                    <div 
+                      key={`${rowIndex}-${index}`} 
+                      className={`aspect-square w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs shadow-sm transform transition-all duration-200 hover:scale-110 ${
+                        item ? getColorClass(item.color) : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                    >
+                      {item ? item.char : ''}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
-            {Object.entries(challenge.colorGroups).map(([color, chars]: [string, any]) => (
-              <div key={color} className={`p-6 rounded-xl shadow-lg ${getColorClass(color)} transform transition-all duration-300 hover:scale-105`}>
-                <div className="text-white font-bold text-lg mb-3 capitalize flex items-center gap-2">
-                  <div className={`w-4 h-4 rounded-full ${getColorClass(color)}`}></div>
-                  {color} Group
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {Array.isArray(chars) ? chars.map((char: string, i: number) => (
-                    <div key={i} className="bg-white/20 backdrop-blur-sm px-3 py-2 rounded-lg text-white font-mono text-xl font-bold shadow-lg">
-                      {char}
-                    </div>
-                  )) : (
-                    <div className="bg-white/20 backdrop-blur-sm px-3 py-2 rounded-lg text-white font-mono text-xl font-bold shadow-lg">
-                      {chars}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+          {/* Character count info */}
+          <div className="text-center text-xs text-muted-foreground">
+            Showing {totalChars} characters across {rows} rows • Find the target character and choose the corresponding direction
           </div>
         </div>
       );
     }
 
     if (challenge.grid && Array.isArray(challenge.grid)) {
+      // Collect ALL characters from ALL challenges with grid data
+      const allChars: Array<{char: string, color: string}> = [];
+      
+      challenges.forEach((challengeItem: any) => {
+        if (challengeItem.grid && Array.isArray(challengeItem.grid)) {
+          challengeItem.grid.forEach((cell: any) => {
+            allChars.push({ 
+              char: cell.char || cell.character || '?', 
+              color: cell.color || 'gray' 
+            });
+          });
+        }
+      });
+
+      // If no characters from other challenges, use current challenge
+      if (allChars.length === 0) {
+        challenge.grid.forEach((cell: any) => {
+          allChars.push({ 
+            char: cell.char || cell.character || '?', 
+            color: cell.color || 'gray' 
+          });
+        });
+      }
+
+      // Create a proper wall layout for grid data
+      const totalChars = allChars.length;
+      const cols = Math.max(12, Math.ceil(Math.sqrt(totalChars * 1.5))); // Wider grid, minimum 12 columns
+      const rows = Math.ceil(totalChars / cols);
+
+      // Distribute characters across the grid
+      const wallGrid: Array<{char: string, color: string} | null>[] = [];
+      for (let row = 0; row < rows; row++) {
+        const rowChars: Array<{char: string, color: string} | null> = [];
+        for (let col = 0; col < cols; col++) {
+          const index = row * cols + col;
+          rowChars.push(index < allChars.length ? allChars[index] : null);
+        }
+        wallGrid.push(rowChars);
+      }
+
       return (
         <div className="space-y-6">
           <div className="text-center">
             <h3 className="text-2xl font-bold mb-2">Find the character:</h3>
-            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse">
+            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse drop-shadow-lg">
               {challenge.targetChar || challenge.target_char || '?'}
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Look for the character in the wall below and choose the direction based on its color section
+            </p>
+          </div>
+          
+          {/* Comprehensive giant wall with ALL characters from ALL challenges */}
+          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-7xl mx-auto overflow-x-auto">
+            <div className="space-y-1 min-w-max">
+              {wallGrid.map((row, rowIndex) => (
+                <div key={rowIndex} className="flex justify-center gap-1">
+                  {row.map((item, index) => (
+                    <div 
+                      key={`${rowIndex}-${index}`} 
+                      className={`aspect-square w-8 h-8 rounded-sm flex items-center justify-center text-white font-bold text-xs shadow-sm transform transition-all duration-200 hover:scale-110 ${
+                        item ? getColorClass(item.color) : 'bg-gray-300 dark:bg-gray-600'
+                      }`}
+                    >
+                      {item ? item.char : ''}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </div>
           
-          <div className="grid grid-cols-5 gap-3 max-w-md mx-auto">
-            {challenge.grid.map((cell: any, index: number) => (
-              <div 
-                key={cell.id || index} 
-                className={`aspect-square rounded-lg flex items-center justify-center text-white font-bold text-2xl shadow-lg transform transition-all duration-300 hover:scale-110 ${getColorClass(cell.color)}`}
-              >
-                {cell.char || cell.character || '?'}
-              </div>
-            ))}
+          {/* Character count info */}
+          <div className="text-center text-xs text-muted-foreground">
+            Showing {totalChars} characters across {rows} rows • Find the target character and choose the corresponding direction
           </div>
         </div>
       );
@@ -627,7 +731,7 @@ export function PotChallengePage() {
           <div className="text-center">
             <div className="inline-flex items-center gap-3 bg-gradient-to-r from-brand-green to-brand-gold text-white px-6 py-3 rounded-full text-xl font-bold shadow-lg">
               <Zap className="w-6 h-6" />
-              1P Challenge {currentRound + 1} of {challenges.length}
+              Round {currentRound + 1} of {challenges.length}
             </div>
           </div>
 
@@ -650,7 +754,7 @@ export function PotChallengePage() {
                     <ArrowUp className="w-5 h-5" />
                   </CardTitle>
                   <CardDescription className="text-center">
-                    Use arrow keys or click buttons • Enter to skip
+                    Find the character's color section and choose the matching direction • Enter to skip
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -716,24 +820,27 @@ export function PotChallengePage() {
                       style={{ width: `${((currentRound + 1) / challenges.length) * 100}%` }}
                     ></div>
                   </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Round {currentRound + 1} of {challenges.length}
+                  </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200">
                 <CardContent className="p-4">
-                  <div className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">Hotkeys</div>
+                  <div className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">Controls</div>
                   <div className="space-y-1 text-xs text-blue-600 dark:text-blue-400">
                     <div className="flex justify-between">
-                      <span>↑</span><span>Up</span>
+                      <span>↑</span><span>Red Section</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>↓</span><span>Down</span>
+                      <span>↓</span><span>Green Section</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>←</span><span>Left</span>
+                      <span>←</span><span>Blue Section</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>→</span><span>Right</span>
+                      <span>→</span><span>Yellow Section</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Enter</span><span>Skip</span>
