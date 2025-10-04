@@ -99,7 +99,7 @@ export function PotsListPage() {
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {loading
-          ? Array.from({ length: 6 }).map((_, i) => <PotCardSkeleton key={i} />)
+          ? Array.from({ length: 6 }).map((_, i) => <PotCardSkeleton key={`skeleton-${i}`} />)
           : pots.map((pot) => (
               <PotCard key={pot.id} pot={pot} />
             ))}

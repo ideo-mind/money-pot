@@ -127,7 +127,7 @@ export function HomePage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {loading
-              ? Array.from({ length: 3 }).map((_, i) => <PotCardSkeleton key={i} />)
+              ? Array.from({ length: 3 }).map((_, i) => <PotCardSkeleton key={`home-skeleton-${i}`} />)
               : featuredPots.length > 0 ? featuredPots.map((pot) => (
                   <PotCard key={pot.id} pot={pot} />
                 )) : (
