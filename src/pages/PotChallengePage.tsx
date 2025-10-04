@@ -40,6 +40,7 @@ export function PotChallengePage() {
   const [attemptId, setAttemptId] = useState<string>("");
   const [selectedDirection, setSelectedDirection] = useState<string>("");
   const [showAnimation, setShowAnimation] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   useEffect(() => {
     if (id) {
       fetchPotById(id);
@@ -301,9 +302,24 @@ export function PotChallengePage() {
     setSolutions(newSolutions);
     
     if (currentRound < challenges.length - 1) {
-      // Move to next challenge
-      setCurrentRound(currentRound + 1);
-      toast.success(`Round ${currentRound + 1} completed! Moving to next challenge...`);
+      // Start transition animation
+      setIsTransitioning(true);
+      
+      // Show success message
+      toast.success(`Challenge ${currentRound + 1} completed!`, {
+        duration: 1500,
+      });
+      
+      // Wait for animation, then move to next challenge
+      setTimeout(() => {
+        setCurrentRound(currentRound + 1);
+        setIsTransitioning(false);
+        
+        // Show next challenge message
+        toast.success(`Starting Challenge ${currentRound + 2}...`, {
+          duration: 1000,
+        });
+      }, 1000);
     } else {
       // All challenges completed - verify with 1P verifier service
       setGameState("verifying");
@@ -492,78 +508,29 @@ export function PotChallengePage() {
       });
 
       return (
-        <div className="space-y-6">
-          <div className="text-center">
-            <h3 className="text-2xl font-bold mb-2">Find the character in the sections below</h3>
-            <p className="text-sm text-muted-foreground mt-2">
-              Choose the direction based on the character's color section
-            </p>
-          </div>
-          
-          {/* Clean 4-section color grid with thick separation */}
-          <div className="bg-gray-100 dark:bg-gray-800 p-6 rounded-xl shadow-inner border-2 border-gray-300 dark:border-gray-600 max-w-4xl mx-auto">
-            <div className="grid grid-cols-2 gap-6">
-              {/* Red Section */}
-              <div className="bg-red-500 p-4 rounded-lg">
-                <div className="grid grid-cols-4 gap-2">
-                  {colorGroups.red.map((char, index) => (
-                    <div 
-                      key={index} 
-                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
-                    >
-                      {char}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Green Section */}
-              <div className="bg-green-500 p-4 rounded-lg">
-                <div className="grid grid-cols-4 gap-2">
-                  {colorGroups.green.map((char, index) => (
-                    <div 
-                      key={index} 
-                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
-                    >
-                      {char}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Blue Section */}
-              <div className="bg-blue-500 p-4 rounded-lg">
-                <div className="grid grid-cols-4 gap-2">
-                  {colorGroups.blue.map((char, index) => (
-                    <div 
-                      key={index} 
-                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
-                    >
-                      {char}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Yellow Section */}
-              <div className="bg-yellow-500 p-4 rounded-lg">
-                <div className="grid grid-cols-4 gap-2">
-                  {colorGroups.yellow.map((char, index) => (
-                    <div 
-                      key={index} 
-                      className="aspect-square bg-white/20 rounded-sm flex items-center justify-center text-white font-bold text-xl"
-                    >
-                      {char}
-                    </div>
-                  ))}
-                </div>
-              </div>
+        <div className="space-y-4">
+          {/* Simple single grid with color backgrounds */}
+          <div className="bg-gray-100 dark:bg-gray-800 p-3 rounded-lg max-w-3xl mx-auto">
+            <div className="grid grid-cols-8 gap-1">
+              {gridChars.map((char, index) => {
+                // Find which color group this character belongs to
+                let charColor = 'gray';
+                Object.entries(challenge.colorGroups).forEach(([color, chars]: [string, any]) => {
+                  if (chars.includes(char)) {
+                    charColor = color;
+                  }
+                });
+                
+                return (
+                  <div 
+                    key={index} 
+                    className={`aspect-square rounded-sm flex items-center justify-center text-white font-bold text-lg ${getColorClass(charColor)}`}
+                  >
+                    {char}
+                  </div>
+                );
+              })}
             </div>
-          </div>
-          
-          {/* Character count info */}
-          <div className="text-center text-xs text-muted-foreground">
-            Red: {colorGroups.red.length} • Green: {colorGroups.green.length} • Blue: {colorGroups.blue.length} • Yellow: {colorGroups.yellow.length} characters
           </div>
         </div>
       );
@@ -699,6 +666,15 @@ export function PotChallengePage() {
       )}
       {gameState === "playing" && currentChallenge && (
         <div className="space-y-8">
+          {/* Transition Loading Overlay */}
+          {isTransitioning && (
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl text-center">
+                <div className="animate-spin w-8 h-8 border-4 border-brand-green border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-lg font-semibold">Moving to next challenge...</p>
+              </div>
+            </div>
+          )}
           {/* Challenge Header */}
           <div className="text-center">
             <div className="inline-flex items-center gap-3 bg-gradient-to-r from-brand-green to-brand-gold text-white px-6 py-3 rounded-full text-xl font-bold shadow-lg">
@@ -707,10 +683,16 @@ export function PotChallengePage() {
             </div>
           </div>
 
-          {/* Tetris-like Challenge Display */}
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-brand-green/20 shadow-2xl">
+          {/* Tetris-like Challenge Display with Transition Animation */}
+          <Card className={`bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-brand-green/20 shadow-2xl transition-all duration-500 ${
+            isTransitioning ? 'opacity-50 scale-95' : 'opacity-100 scale-100'
+          }`}>
             <CardContent className="p-8">
-              <TetrisChallenge challenge={currentChallenge} />
+              <div className={`transition-all duration-500 ${
+                isTransitioning ? 'transform translate-y-4 opacity-0' : 'transform translate-y-0 opacity-100'
+              }`}>
+                <TetrisChallenge challenge={currentChallenge} />
+              </div>
             </CardContent>
           </Card>
 
