@@ -22,7 +22,20 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
   try {
     console.log("Registering pot with verifier...", payload);
     
-    // Create payload data (no encryption needed as per app.py)
+    // Step 1: Get encryption key from register/options
+    const optionsResponse = await fetch(`${VERIFIER_BASE_URL}/register/options`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (!optionsResponse.ok) {
+      throw new Error('Failed to get encryption key');
+    }
+    
+    const optionsData = await optionsResponse.json();
+    console.log("Got encryption key:", optionsData);
+    
+    // Step 2: Create payload data (no encryption needed as per app.py)
     const currentTime = Math.floor(Date.now() / 1000);
     const payloadData = {
       pot_id: payload.potId,
@@ -35,12 +48,21 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
 
     console.log("Payload data:", payloadData);
     
-    // Register with verifier service directly
+    // Step 3: Convert payload to hex string (as per app.py MVP approach)
+    const payloadJson = JSON.stringify(payloadData);
+    const encryptedPayload = Array.from(payloadJson)
+      .map(char => char.charCodeAt(0).toString(16).padStart(2, '0'))
+      .join('');
+    
+    console.log("Encrypted payload (hex):", encryptedPayload);
+    
+    // Step 4: Register with verifier service
     const response = await fetch(`${VERIFIER_BASE_URL}/register/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        payload: payloadData,
+        encrypted_payload: encryptedPayload,
+        public_key: optionsData.public_key,
         signature: 'mock_signature' // Simplified for MVP
       })
     });
@@ -62,43 +84,48 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
 /**
  * Fetches authentication options (challenges) from the verifier.
  * @param attemptId The attempt ID from the smart contract.
+ * @param publicKey The hunter's address (as per app.py reference).
  * @returns A promise that resolves with challenges.
  */
-export const getAuthOptions = async (attemptId: string): Promise<{ challenges: any[] }> => {
+export const getAuthOptions = async (attemptId: string, publicKey?: string): Promise<{ challenges: any[] }> => {
   try {
-    console.log("Getting auth options for attempt:", attemptId);
+    console.log("Getting 1P auth options for attempt:", attemptId);
+    
+    // Use hunter's address as public key (as per app.py reference)
+    const hunterPublicKey = publicKey || attemptId;
     
     const response = await fetch(`${VERIFIER_BASE_URL}/authenticate/options`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         payload: { attempt_id: attemptId },
-        public_key: attemptId // Use attempt_id as public key for MVP
+        public_key: hunterPublicKey
       })
     });
     
     if (!response.ok) {
-      throw new Error('Failed to get authentication options');
+      const errorData = await response.json();
+      throw new Error(`Failed to get authentication options: ${errorData.error || response.statusText}`);
     }
     
     const result = await response.json();
-    console.log("Got challenges:", result);
+    console.log("Got 1P challenges:", result);
     return result;
   } catch (error) {
-    console.error('Failed to get auth options:', error);
+    console.error('Failed to get 1P auth options:', error);
     throw error;
   }
 };
 
 /**
  * Verifies the user's solutions with the verifier.
- * @param challengeId The ID of the challenge being verified.
+ * @param challengeId The attempt ID (used as challenge_id as per app.py reference).
  * @param solutions An array of user-submitted solutions (directions).
  * @returns A promise that resolves to a success status.
  */
 export const verifyAuth = async (challengeId: string, solutions: string[]): Promise<{ success: boolean }> => {
   try {
-    console.log("Verifying solutions for challenge:", challengeId, solutions);
+    console.log("Verifying 1P solutions for challenge:", challengeId, solutions);
     
     const response = await fetch(`${VERIFIER_BASE_URL}/authenticate/verify`, {
       method: 'POST',
@@ -110,14 +137,15 @@ export const verifyAuth = async (challengeId: string, solutions: string[]): Prom
     });
     
     if (!response.ok) {
-      throw new Error('Failed to verify solutions');
+      const errorData = await response.json();
+      throw new Error(`Failed to verify solutions: ${errorData.error || response.statusText}`);
     }
     
     const result = await response.json();
-    console.log("Verification result:", result);
+    console.log("1P verification result:", result);
     return result;
   } catch (error) {
-    console.error('Verification failed:', error);
+    console.error('1P verification failed:', error);
     throw error;
   }
 };

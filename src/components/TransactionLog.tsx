@@ -93,7 +93,7 @@ const TransactionItem: React.FC<{ transaction: Transaction }> = ({ transaction }
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-xs"
-            onClick={() => window.open(`https://explorer.aptoslabs.com/txn/${transaction.hash}`, '_blank')}
+            onClick={() => window.open(`https://explorer.aptoslabs.com/txn/${transaction.hash}?network=testnet`, '_blank')}
           >
             <ExternalLink className="w-3 h-3 mr-1" />
             View on Explorer
