@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { usePotStore } from "@/store/pot-store";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Loader2, PartyPopper, ShieldClose, SkipForward, CheckCircle2, XCircle, KeyRound } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Loader2, PartyPopper, ShieldClose, SkipForward, CheckCircle2, XCircle, KeyRound, Zap } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
@@ -38,11 +38,66 @@ export function PotChallengePage() {
   const [currentRound, setCurrentRound] = useState(0);
   const [solutions, setSolutions] = useState<string[]>([]);
   const [attemptId, setAttemptId] = useState<string>("");
+  const [selectedDirection, setSelectedDirection] = useState<string>("");
+  const [showAnimation, setShowAnimation] = useState(false);
   useEffect(() => {
     if (id) {
       fetchPotById(id);
     }
   }, [id, fetchPotById]);
+
+  const handleDirectionSelect = useCallback((direction: string) => {
+    if (gameState !== "playing") return;
+    
+    setSelectedDirection(direction);
+    setShowAnimation(true);
+    
+    // Add visual feedback
+    const directionNames = { U: 'Up', D: 'Down', L: 'Left', R: 'Right', S: 'Skip' };
+    toast.success(`Selected: ${directionNames[direction as keyof typeof directionNames]}`, {
+      duration: 1000,
+    });
+    
+    // Auto-submit after brief animation
+    setTimeout(() => {
+      submitMove(direction);
+      setSelectedDirection("");
+      setShowAnimation(false);
+    }, 500);
+  }, [gameState]);
+
+  // Hotkey support for better UX
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (gameState !== "playing" || !challenges || challenges.length === 0) return;
+      
+      // Prevent default behavior for our hotkeys
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(event.key)) {
+        event.preventDefault();
+      }
+      
+      switch (event.key) {
+        case 'ArrowUp':
+          handleDirectionSelect('U');
+          break;
+        case 'ArrowDown':
+          handleDirectionSelect('D');
+          break;
+        case 'ArrowLeft':
+          handleDirectionSelect('L');
+          break;
+        case 'ArrowRight':
+          handleDirectionSelect('R');
+          break;
+        case 'Enter':
+          handleDirectionSelect('S');
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [gameState, challenges, handleDirectionSelect]);
   const validateKey = useCallback(async (key: string) => {
     if (!key || !pot) return;
     setKeyState("validating");
@@ -389,6 +444,99 @@ export function PotChallengePage() {
   if (currentChallenge) {
     console.log("Current challenge structure:", currentChallenge);
   }
+
+  // Tetris-like Challenge Component
+  const TetrisChallenge = ({ challenge }: { challenge: any }) => {
+    const getColorClass = (color: string) => {
+      switch (color?.toLowerCase()) {
+        case 'red': return 'bg-red-500 shadow-red-500/50';
+        case 'green': return 'bg-green-500 shadow-green-500/50';
+        case 'blue': return 'bg-blue-500 shadow-blue-500/50';
+        case 'yellow': return 'bg-yellow-500 shadow-yellow-500/50';
+        default: return 'bg-gray-500 shadow-gray-500/50';
+      }
+    };
+
+    const getDirectionColor = (direction: string) => {
+      switch (direction) {
+        case 'U': return 'bg-red-100 border-red-500 text-red-700';
+        case 'D': return 'bg-green-100 border-green-500 text-green-700';
+        case 'L': return 'bg-blue-100 border-blue-500 text-blue-700';
+        case 'R': return 'bg-yellow-100 border-yellow-500 text-yellow-700';
+        case 'S': return 'bg-gray-100 border-gray-500 text-gray-700';
+        default: return 'bg-gray-100 border-gray-300 text-gray-600';
+      }
+    };
+
+    if (challenge.colorGroups) {
+      return (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h3 className="text-2xl font-bold mb-2">Find the character:</h3>
+            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse">
+              {challenge.targetChar || challenge.target_char || '?'}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            {Object.entries(challenge.colorGroups).map(([color, chars]: [string, any]) => (
+              <div key={color} className={`p-6 rounded-xl shadow-lg ${getColorClass(color)} transform transition-all duration-300 hover:scale-105`}>
+                <div className="text-white font-bold text-lg mb-3 capitalize flex items-center gap-2">
+                  <div className={`w-4 h-4 rounded-full ${getColorClass(color)}`}></div>
+                  {color} Group
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Array.isArray(chars) ? chars.map((char: string, i: number) => (
+                    <div key={i} className="bg-white/20 backdrop-blur-sm px-3 py-2 rounded-lg text-white font-mono text-xl font-bold shadow-lg">
+                      {char}
+                    </div>
+                  )) : (
+                    <div className="bg-white/20 backdrop-blur-sm px-3 py-2 rounded-lg text-white font-mono text-xl font-bold shadow-lg">
+                      {chars}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (challenge.grid && Array.isArray(challenge.grid)) {
+      return (
+        <div className="space-y-6">
+          <div className="text-center">
+            <h3 className="text-2xl font-bold mb-2">Find the character:</h3>
+            <div className="text-6xl font-mono font-bold text-brand-gold animate-pulse">
+              {challenge.targetChar || challenge.target_char || '?'}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-5 gap-3 max-w-md mx-auto">
+            {challenge.grid.map((cell: any, index: number) => (
+              <div 
+                key={cell.id || index} 
+                className={`aspect-square rounded-lg flex items-center justify-center text-white font-bold text-2xl shadow-lg transform transition-all duration-300 hover:scale-110 ${getColorClass(cell.color)}`}
+              >
+                {cell.char || cell.character || '?'}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-center p-8">
+        <p className="text-lg text-muted-foreground mb-4">Challenge data received:</p>
+        <pre className="text-xs bg-gray-100 p-4 rounded overflow-auto max-h-64">
+          {JSON.stringify(challenge, null, 2)}
+        </pre>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-5xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
       <Toaster richColors position="top-right" />
@@ -474,75 +622,125 @@ export function PotChallengePage() {
         </div>
       )}
       {gameState === "playing" && currentChallenge && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center">
-                  1P Challenge {currentRound + 1} of {challenges.length}
-                </CardTitle>
-                <CardDescription className="text-center">
-                  Find the character: <span className="text-brand-gold font-mono text-2xl">{currentChallenge.targetChar || currentChallenge.target_char || '?'}</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Handle different challenge data structures */}
-                {currentChallenge.grid && Array.isArray(currentChallenge.grid) ? (
-                  <div className="grid grid-cols-5 gap-2 aspect-square">
-                    {currentChallenge.grid.map((cell: any, index: number) => (
-                      <div key={cell.id || index} className={`w-full h-full rounded-md flex items-center justify-center text-white font-bold text-2xl ${cell.color || 'bg-gray-500'}`}>
-                        {cell.char || cell.character || '?'}
-                      </div>
-                    ))}
-                  </div>
-                ) : currentChallenge.colorGroups ? (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">Color Groups:</h3>
-                    {Object.entries(currentChallenge.colorGroups).map(([color, chars]: [string, any]) => (
-                      <div key={color} className={`p-4 rounded-lg ${color === 'red' ? 'bg-red-100' : color === 'green' ? 'bg-green-100' : color === 'blue' ? 'bg-blue-100' : color === 'yellow' ? 'bg-yellow-100' : 'bg-gray-100'}`}>
-                        <div className="font-semibold capitalize">{color}:</div>
-                        <div className="flex gap-2 mt-2">
-                          {Array.isArray(chars) ? chars.map((char: string, i: number) => (
-                            <span key={i} className="px-2 py-1 bg-white rounded text-lg font-mono">{char}</span>
-                          )) : (
-                            <span className="px-2 py-1 bg-white rounded text-lg font-mono">{chars}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center p-8">
-                    <p className="text-lg text-muted-foreground">Challenge data received:</p>
-                    <pre className="mt-4 text-xs bg-gray-100 p-4 rounded overflow-auto">
-                      {JSON.stringify(currentChallenge, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                <div className="mt-4 text-center text-sm text-muted-foreground">
-                  Look for the target character and choose the direction based on its color group
-                </div>
-              </CardContent>
-            </Card>
+        <div className="space-y-8">
+          {/* Challenge Header */}
+          <div className="text-center">
+            <div className="inline-flex items-center gap-3 bg-gradient-to-r from-brand-green to-brand-gold text-white px-6 py-3 rounded-full text-xl font-bold shadow-lg">
+              <Zap className="w-6 h-6" />
+              1P Challenge {currentRound + 1} of {challenges.length}
+            </div>
           </div>
-          <div className="space-y-4">
-            <Card>
-              <CardHeader><CardTitle>1P Directions</CardTitle></CardHeader>
-              <CardContent className="grid grid-cols-3 gap-2">
-                <div></div>
-                <Button onClick={() => submitMove("U")} size="lg" variant="outline" className="h-16"><ArrowUp /></Button>
-                <div></div>
-                <Button onClick={() => submitMove("L")} size="lg" variant="outline" className="h-16"><ArrowLeft /></Button>
-                <Button onClick={() => submitMove("D")} size="lg" variant="outline" className="h-16"><ArrowDown /></Button>
-                <Button onClick={() => submitMove("R")} size="lg" variant="outline" className="h-16"><ArrowRight /></Button>
-              </CardContent>
-            </Card>
-            <Button onClick={() => submitMove("S")} size="lg" variant="secondary" className="w-full h-16 text-lg">
-              <SkipForward className="mr-2" /> Skip (S)
-            </Button>
-            <div className="text-xs text-muted-foreground text-center">
-              <p>U=Up, D=Down, L=Left, R=Right, S=Skip</p>
-              <p>Round {currentRound + 1} of {challenges.length}</p>
+
+          {/* Tetris-like Challenge Display */}
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-2 border-brand-green/20 shadow-2xl">
+            <CardContent className="p-8">
+              <TetrisChallenge challenge={currentChallenge} />
+            </CardContent>
+          </Card>
+
+          {/* Direction Controls */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Direction Pad */}
+            <div className="lg:col-span-2">
+              <Card className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-center flex items-center justify-center gap-2">
+                    <ArrowUp className="w-5 h-5" />
+                    Choose Direction
+                    <ArrowUp className="w-5 h-5" />
+                  </CardTitle>
+                  <CardDescription className="text-center">
+                    Use arrow keys or click buttons • Enter to skip
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 max-w-sm mx-auto">
+                    <div></div>
+                    <Button 
+                      onClick={() => handleDirectionSelect('U')} 
+                      size="lg" 
+                      variant="outline" 
+                      className={`h-20 text-2xl font-bold transition-all duration-200 hover:scale-105 ${selectedDirection === 'U' ? 'bg-red-100 border-red-500 text-red-700 shadow-lg' : 'hover:bg-red-50'}`}
+                    >
+                      <ArrowUp className="w-8 h-8" />
+                    </Button>
+                    <div></div>
+                    <Button 
+                      onClick={() => handleDirectionSelect('L')} 
+                      size="lg" 
+                      variant="outline" 
+                      className={`h-20 text-2xl font-bold transition-all duration-200 hover:scale-105 ${selectedDirection === 'L' ? 'bg-blue-100 border-blue-500 text-blue-700 shadow-lg' : 'hover:bg-blue-50'}`}
+                    >
+                      <ArrowLeft className="w-8 h-8" />
+                    </Button>
+                    <Button 
+                      onClick={() => handleDirectionSelect('D')} 
+                      size="lg" 
+                      variant="outline" 
+                      className={`h-20 text-2xl font-bold transition-all duration-200 hover:scale-105 ${selectedDirection === 'D' ? 'bg-green-100 border-green-500 text-green-700 shadow-lg' : 'hover:bg-green-50'}`}
+                    >
+                      <ArrowDown className="w-8 h-8" />
+                    </Button>
+                    <Button 
+                      onClick={() => handleDirectionSelect('R')} 
+                      size="lg" 
+                      variant="outline" 
+                      className={`h-20 text-2xl font-bold transition-all duration-200 hover:scale-105 ${selectedDirection === 'R' ? 'bg-yellow-100 border-yellow-500 text-yellow-700 shadow-lg' : 'hover:bg-yellow-50'}`}
+                    >
+                      <ArrowRight className="w-8 h-8" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Skip Button & Progress */}
+            <div className="space-y-4">
+              <Button 
+                onClick={() => handleDirectionSelect('S')} 
+                size="lg" 
+                variant="secondary" 
+                className={`w-full h-20 text-xl font-bold transition-all duration-200 hover:scale-105 ${selectedDirection === 'S' ? 'bg-gray-200 border-gray-500 text-gray-700 shadow-lg' : ''}`}
+              >
+                <SkipForward className="mr-3 w-6 h-6" /> 
+                Skip (Enter)
+              </Button>
+              
+              <Card className="bg-gradient-to-br from-brand-gold/10 to-brand-green/10 border-brand-gold/20">
+                <CardContent className="p-4 text-center">
+                  <div className="text-sm font-semibold text-brand-gold mb-2">Progress</div>
+                  <div className="text-2xl font-bold">{currentRound + 1} / {challenges.length}</div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-gradient-to-r from-brand-green to-brand-gold h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${((currentRound + 1) / challenges.length) * 100}%` }}
+                    ></div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">Hotkeys</div>
+                  <div className="space-y-1 text-xs text-blue-600 dark:text-blue-400">
+                    <div className="flex justify-between">
+                      <span>↑</span><span>Up</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>↓</span><span>Down</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>←</span><span>Left</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>→</span><span>Right</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Enter</span><span>Skip</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
