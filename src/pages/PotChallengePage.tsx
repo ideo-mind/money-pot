@@ -312,13 +312,15 @@ export function PotChallengePage() {
       
       // Wait for animation, then move to next challenge
       setTimeout(() => {
-        setCurrentRound(currentRound + 1);
-        setIsTransitioning(false);
-        
-        // Show next challenge message
-        toast.success(`Starting Challenge ${currentRound + 2}...`, {
-          duration: 1000,
+        setCurrentRound(prev => {
+          const nextRound = prev + 1;
+          // Show next challenge message
+          toast.success(`Starting Challenge ${nextRound + 1}...`, {
+            duration: 1000,
+          });
+          return nextRound;
         });
+        setIsTransitioning(false);
       }, 1000);
     } else {
       // All challenges completed - verify with 1P verifier service
