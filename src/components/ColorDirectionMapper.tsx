@@ -2,20 +2,21 @@ import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/c
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useMemo } from 'react';
-import { COLORS, MAPPABLE_DIRECTIONS } from '@/lib/constants';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 interface ColorDirectionMapperProps {
   colorMap: Record<string, string>;
   setColorMap: (map: Record<string, string>) => void;
+  colors: Record<string, string>;
+  directions: string[];
 }
 const DirectionIcon = ({ direction }: { direction: string }) => {
-  switch (direction) {
-    case 'Up': return <ArrowUp className="w-5 h-5" />;
-    case 'Down': return <ArrowDown className="w-5 h-5" />;
-    case 'Left': return <ArrowLeft className="w-5 h-5" />;
-    case 'Right': return <ArrowRight className="w-5 h-5" />;
-    default: return null;
+  switch (direction.toUpperCase()) {
+    case 'U': return <ArrowUp className="w-5 h-5" />;
+    case 'D': return <ArrowDown className="w-5 h-5" />;
+    case 'L': return <ArrowLeft className="w-5 h-5" />;
+    case 'R': return <ArrowRight className="w-5 h-5" />;
+    default: return <span className="text-sm font-bold">{direction}</span>;
   }
 };
 function DraggableDirection({ direction }: { direction: string }) {
@@ -31,22 +32,22 @@ function DraggableDirection({ direction }: { direction: string }) {
     </div>
   );
 }
-function DroppableColor({ color, mappedDirection, children }: { color: { name: string; class: string }, mappedDirection?: string, children: React.ReactNode }) {
-  const { isOver, setNodeRef } = useDroppable({ id: color.class });
+function DroppableColor({ colorName, colorValue, mappedDirection, children }: { colorName: string; colorValue: string, mappedDirection?: string, children: React.ReactNode }) {
+  const { isOver, setNodeRef } = useDroppable({ id: colorName });
   return (
     <div ref={setNodeRef} className="flex items-center gap-4 p-3 border rounded-lg bg-background">
-      <div className={`w-10 h-10 rounded-full ${color.class}`} />
+      <div className="w-10 h-10 rounded-full" style={{ backgroundColor: colorValue }} />
       <div className={`flex-1 h-12 flex items-center justify-center rounded-md border-2 ${isOver ? 'border-brand-green border-dashed' : 'border-transparent'}`}>
         {children}
       </div>
     </div>
   );
 }
-export function ColorDirectionMapper({ colorMap, setColorMap }: ColorDirectionMapperProps) {
+export function ColorDirectionMapper({ colorMap, setColorMap, colors, directions }: ColorDirectionMapperProps) {
   const unmappedDirections = useMemo(() => {
     const mapped = Object.values(colorMap);
-    return MAPPABLE_DIRECTIONS.filter(dir => !mapped.includes(dir));
-  }, [colorMap]);
+    return directions.filter(dir => !mapped.includes(dir));
+  }, [colorMap, directions]);
   const handleDragEnd = (event: DragEndEvent) => {
     const { over, active } = event;
     if (over && active) {
@@ -81,10 +82,10 @@ export function ColorDirectionMapper({ colorMap, setColorMap }: ColorDirectionMa
           </div>
         </Card>
         <div className="space-y-3">
-          {COLORS.map(color => {
-            const mappedDirection = colorMap[color.class];
+          {Object.entries(colors).map(([colorName, colorValue]) => {
+            const mappedDirection = colorMap[colorName];
             return (
-              <DroppableColor key={color.class} color={color} mappedDirection={mappedDirection}>
+              <DroppableColor key={colorName} colorName={colorName} colorValue={colorValue} mappedDirection={mappedDirection}>
                 {mappedDirection ? (
                   <DraggableDirection direction={mappedDirection} />
                 ) : (

@@ -12,13 +12,26 @@ export interface RegisterPayload {
   oneFaAddress: string;
 }
 
+export interface RegisterOptions {
+  key_id: string;
+  public_key: string;
+  colors: Record<string, string>;
+  directions: Record<string, string>;
+}
+
+export interface AuthOptions {
+  challenges: any[];
+  colors: Record<string, string>;
+  directions: Record<string, string>;
+}
+
 
 /**
  * Registers a pot's challenge details with the verifier service.
  * @param payload The registration data.
  * @returns A promise that resolves to a success status.
  */
-export const registerPot = async (payload: RegisterPayload): Promise<{ success: boolean }> => {
+export const registerPot = async (payload: RegisterPayload): Promise<{ success: boolean; colors: Record<string, string>; directions: Record<string, string> }> => {
   try {
     console.log("Registering pot with verifier...", payload);
     
@@ -77,7 +90,11 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
     
     const result = await response.json();
     console.log("Pot registered successfully:", result);
-    return result;
+    return {
+      success: result.success || true,
+      colors: optionsData.colors,
+      directions: optionsData.directions
+    };
   } catch (error) {
     console.error('Registration failed:', error);
     throw error;
@@ -90,7 +107,7 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
  * @param publicKey The hunter's address (as per app.py reference).
  * @returns A promise that resolves with challenges.
  */
-export const getAuthOptions = async (attemptId: string, publicKey?: string): Promise<{ challenges: any[] }> => {
+export const getAuthOptions = async (attemptId: string, publicKey?: string): Promise<AuthOptions> => {
   try {
     console.log("Getting 1P auth options for attempt:", attemptId);
     
@@ -113,7 +130,11 @@ export const getAuthOptions = async (attemptId: string, publicKey?: string): Pro
     
     const result = await response.json();
     console.log("Got 1P challenges:", result);
-    return result;
+    return {
+      challenges: result.challenges || [],
+      colors: result.colors || {},
+      directions: result.directions || {}
+    };
   } catch (error) {
     console.error('Failed to get 1P auth options:', error);
     throw error;

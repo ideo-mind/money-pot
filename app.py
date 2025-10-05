@@ -132,6 +132,10 @@ class MoneyPotApp:
         self.creator_account = None
         self.hunter_account = None
         self.verifier = None
+        self.colors = None
+        self.directions = None
+        self.password = None
+        self.legend = None
     
     async def initialize(self):
         """Initialize the application"""
@@ -150,10 +154,27 @@ class MoneyPotApp:
         # Initialize verifier service client
         self.verifier = VerifierServiceClient(MONEY_AUTH_URL)
         
-        # Check verifier service health
+        # Check verifier service health and get configuration
         async with self.verifier as verifier:
             health = await verifier.health_check()
             print(f"✅ Verifier service: {health['status']}")
+            
+            # Get colors and directions from register options
+            register_options = await verifier.register_options()
+            self.colors = register_options.get('colors', {})
+            self.directions = register_options.get('directions', {})
+            print(f"✅ Colors: {self.colors}")
+            print(f"✅ Directions: {self.directions}")
+            
+            # Set default password and create legend mapping
+            self.password = "A"  # Default password
+            self.legend = {
+                "red": self.directions.get("up", "U"),
+                "green": self.directions.get("down", "D"), 
+                "blue": self.directions.get("left", "L"),
+                "yellow": self.directions.get("right", "R")
+            }
+            print(f"✅ Legend: {self.legend}")
     
     async def create_pot_flow(self, amount: int = 10000, duration_seconds: int = 360, fee: int = 100):
         """Complete pot creation and registration flow"""
@@ -189,8 +210,8 @@ class MoneyPotApp:
             current_time = int(asyncio.get_event_loop().time())
             payload = {
                 "pot_id": str(pot_id),
-                "1p": "A",  # Single character password
-                "legend": {"red": "U", "green": "D", "blue": "L", "yellow": "R"},  # Color-based legend
+                "1p": self.password,  # Dynamic password
+                "legend": self.legend,  # Dynamic legend from register options
                 "iat": current_time,
                 "iss": str(self.creator_account.address()),
                 "exp": current_time + 3600

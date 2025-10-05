@@ -41,6 +41,8 @@ export function PotChallengePage() {
   const [attemptId, setAttemptId] = useState<string>("");
   const [selectedDirection, setSelectedDirection] = useState<string>("");
   const [showAnimation, setShowAnimation] = useState(false);
+  const [dynamicColors, setDynamicColors] = useState<Record<string, string>>({});
+  const [dynamicDirections, setDynamicDirections] = useState<Record<string, string>>({});
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   useEffect(() => {
@@ -269,6 +271,12 @@ export function PotChallengePage() {
       try {
         const authResponse = await getAuthOptions(extractedAttemptId.toString(), hunterAddress.toString());
         console.log("Full auth response:", authResponse);
+        
+        // Store dynamic colors and directions
+        setDynamicColors(authResponse.colors || {});
+        setDynamicDirections(authResponse.directions || {});
+        console.log("Dynamic colors:", authResponse.colors);
+        console.log("Dynamic directions:", authResponse.directions);
         
       const fetchedChallenges = authResponse.challenges || [];
       console.log("Received 1P challenges:", fetchedChallenges);
@@ -618,6 +626,8 @@ export function PotChallengePage() {
           <AuthenticationDisplay
             challenge={currentChallenge}
             isTransitioning={isTransitioning}
+            colors={dynamicColors}
+            directions={dynamicDirections}
           />
 
           {/* Direction Controls */}

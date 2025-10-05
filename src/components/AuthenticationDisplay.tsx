@@ -8,9 +8,11 @@ import { Circle, Grid3x3, Pizza, Hexagon, Square, Sparkles, Search } from 'lucid
 interface AuthenticationDisplayProps {
   challenge: any;
   isTransitioning?: boolean;
+  colors?: Record<string, string>;
+  directions?: Record<string, string>;
 }
 
-export function AuthenticationDisplay({ challenge, isTransitioning = false }: AuthenticationDisplayProps) {
+export function AuthenticationDisplay({ challenge, isTransitioning = false, colors = {}, directions = {} }: AuthenticationDisplayProps) {
   const [selectedLayout, setSelectedLayout] = useState<'orb' | 'pizza' | 'honeycomb' | 'spiral' | 'unicode'>('orb');
   const [hoveredChar, setHoveredChar] = useState<string | null>(null);
   const [searchChar, setSearchChar] = useState<string>('');
@@ -22,6 +24,15 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
     const shadow = isHovered || isHighlighted ? 'shadow-2xl' : 'shadow-lg';
     const scale = isHighlighted ? 'scale-125 ring-4 ring-white z-10' : 'hover:scale-110';
 
+    // Use dynamic color if available, otherwise fallback to hardcoded
+    const colorValue = colors[color?.toLowerCase()] || color;
+    
+    if (colorValue && colorValue.startsWith('#')) {
+      // Use inline style for dynamic colors
+      return `${shadow} text-white ${scale}`;
+    }
+
+    // Fallback to hardcoded colors
     switch (color?.toLowerCase()) {
       case 'red':
         return `bg-gradient-to-br from-red-400 to-red-600 ${shadow} shadow-red-500/50 text-white hover:from-red-500 hover:to-red-700 ${scale}`;
@@ -34,6 +45,14 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
       default:
         return `bg-gradient-to-br from-gray-400 to-gray-600 ${shadow} shadow-gray-500/50 text-white hover:from-gray-500 hover:to-gray-700 ${scale}`;
     }
+  };
+
+  const getColorStyle = (color: string) => {
+    const colorValue = colors[color?.toLowerCase()] || color;
+    if (colorValue && colorValue.startsWith('#')) {
+      return { backgroundColor: colorValue };
+    }
+    return {};
   };
 
   const getCharColor = (char: string) => {
@@ -134,7 +153,10 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
                     cy={y}
                     r={isHovered ? "24" : "20"}
                     className={getColorClass(color, hoveredChar === char, searchChar === char)}
-                    style={{ transition: 'all 0.3s ease' }}
+                    style={{ 
+                      transition: 'all 0.3s ease',
+                      ...getColorStyle(color)
+                    }}
                   />
                   <text
                     x={x}
@@ -210,7 +232,8 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
                             } ${isHovered ? 'scale-110' : 'scale-100'}`}
                             style={{
                               transform: `rotate(-${rotation}deg)`,
-                              transition: 'all 0.3s ease'
+                              transition: 'all 0.3s ease',
+                              ...getColorStyle(color)
                             }}
                             onMouseEnter={() => setHoveredChar(char)}
                             onMouseLeave={() => setHoveredChar(null)}
@@ -355,6 +378,7 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
                   className={getColorClass(color, hoveredChar === char, searchChar === char)}
                   style={{
                     transition: 'all 2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    ...getColorStyle(color),
                     opacity: spiralAnimation === 'static' ? 1 : 0.9
                   }}
                 />
@@ -410,12 +434,10 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
           return (
             <div key={color} className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full ${
-                  color === 'red' ? 'bg-red-500' :
-                  color === 'green' ? 'bg-green-500' :
-                  color === 'blue' ? 'bg-blue-500' :
-                  'bg-yellow-500'
-                }`}></div>
+                <div 
+                  className="w-6 h-6 rounded-full"
+                  style={getColorStyle(color)}
+                ></div>
                 <span className="text-sm text-muted-foreground">
                   {chars.length} characters
                 </span>
@@ -434,6 +456,7 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
                       className={`w-14 h-14 rounded-lg flex items-center justify-center font-bold text-2xl transform transition-all duration-200 cursor-pointer relative ${
                         getColorClass(color, hoveredChar === char, searchChar === char)
                       }`}
+                      style={getColorStyle(color)}
                       onMouseEnter={() => setHoveredChar(char)}
                       onMouseLeave={() => setHoveredChar(null)}
                     >
@@ -492,12 +515,10 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
             {(() => {
               const color = getCharColor(searchChar);
               return color !== 'gray' ? (
-                <span className={`ml-2 w-4 h-4 inline-block rounded-full ${
-                  color === 'red' ? 'bg-red-500' :
-                  color === 'green' ? 'bg-green-500' :
-                  color === 'blue' ? 'bg-blue-500' :
-                  color === 'yellow' ? 'bg-yellow-500' : ''
-                }`}>
+                <span 
+                  className="ml-2 w-4 h-4 inline-block rounded-full"
+                  style={getColorStyle(color)}
+                >
                 </span>
               ) : (
                 <span className="ml-2 text-xs text-muted-foreground">Not found in grid</span>
@@ -549,13 +570,10 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
             <div className="text-sm text-muted-foreground">
               Unicode: {hoveredChar.charCodeAt(0)}
             </div>
-            <div className={`mt-2 w-8 h-8 mx-auto rounded-full ${
-              getCharColor(hoveredChar) === 'red' ? 'bg-red-500' :
-              getCharColor(hoveredChar) === 'green' ? 'bg-green-500' :
-              getCharColor(hoveredChar) === 'blue' ? 'bg-blue-500' :
-              getCharColor(hoveredChar) === 'yellow' ? 'bg-yellow-500' :
-              'bg-gray-500'
-            }`}>
+            <div 
+              className="mt-2 w-8 h-8 mx-auto rounded-full"
+              style={getColorStyle(getCharColor(hoveredChar))}
+            >
             </div>
           </div>
         </div>

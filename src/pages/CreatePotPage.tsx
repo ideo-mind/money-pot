@@ -20,7 +20,8 @@ import type { money_pot_manager } from "@/abis/0xea89ef9798a210009339ea6105c2008
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CopyableInput } from "@/components/CopyableInput";
-import { MAPPABLE_DIRECTIONS, CHARACTER_DOMAINS, COLORS } from "@/lib/constants";
+import { CHARACTER_DOMAINS } from "@/lib/constants";
+import { getAuthOptions } from "@/lib/api";
 import { ColorDirectionMapper } from "@/components/ColorDirectionMapper";
 import { CharacterSelector } from "@/components/CharacterSelector";
 import { SuccessAnimation } from "@/components/SuccessAnimation";
@@ -57,6 +58,9 @@ export function CreatePotPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [creationSuccess, setCreationSuccess] = useState(false);
+  const [dynamicColors, setDynamicColors] = useState<Record<string, string>>({});
+  const [dynamicDirections, setDynamicDirections] = useState<Record<string, string>>({});
+  const [mappableDirections, setMappableDirections] = useState<string[]>([]);
   useEffect(() => {
     const allCharacters = Object.values(CHARACTER_DOMAINS).flat();
     const randomChar = allCharacters[Math.floor(Math.random() * allCharacters.length)];
@@ -64,6 +68,50 @@ export function CreatePotPage() {
     toast.info("Random 1P character chosen by default", {
       description: "You can change it in Step 3.",
     });
+  }, []);
+
+  // Fetch dynamic colors and directions from backend
+  useEffect(() => {
+    const fetchDynamicData = async () => {
+      try {
+        // Use a dummy attempt ID to get the dynamic data
+        const authOptions = await getAuthOptions("dummy", "dummy");
+        setDynamicColors(authOptions.colors);
+        setDynamicDirections(authOptions.directions);
+        
+        // Extract mappable directions (exclude skip)
+        const directions = Object.values(authOptions.directions);
+        setMappableDirections(directions.filter(dir => dir.toLowerCase() !== 'skip'));
+        
+        // Initialize color map with dynamic colors
+        const initialColorMap: Record<string, string> = {};
+        Object.keys(authOptions.colors).forEach((color, index) => {
+          if (index < directions.length) {
+            initialColorMap[color] = directions[index];
+          }
+        });
+        setColorMap(initialColorMap);
+      } catch (error) {
+        console.error("Failed to fetch dynamic colors and directions:", error);
+        // Fallback to hardcoded values
+        setDynamicColors({
+          red: "#ef4444",
+          green: "#22c55e", 
+          blue: "#3b82f6",
+          yellow: "#eab308"
+        });
+        setDynamicDirections({
+          up: "U",
+          down: "D", 
+          left: "L",
+          right: "R",
+          skip: "S"
+        });
+        setMappableDirections(["U", "D", "L", "R"]);
+      }
+    };
+    
+    fetchDynamicData();
   }, []);
   const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, steps.length));
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
@@ -113,7 +161,7 @@ export function CreatePotPage() {
       case 2:
         return true; // 1FA private key is now optional
       case 3:
-        return !!password && Object.keys(colorMap).length === MAPPABLE_DIRECTIONS.length;
+        return !!password && Object.keys(colorMap).length === mappableDirections.length;
       default:
         return true;
     }
@@ -135,14 +183,16 @@ export function CreatePotPage() {
     setEntryFee(clampedValue);
   };
   const randomizeColorMap = () => {
-    const shuffledDirections = [...MAPPABLE_DIRECTIONS];
+    const shuffledDirections = [...mappableDirections];
     for (let i = shuffledDirections.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffledDirections[i], shuffledDirections[j]] = [shuffledDirections[j], shuffledDirections[i]];
     }
     const newColorMap: Record<string, string> = {};
-    COLORS.forEach((color, index) => {
-      newColorMap[color.class] = shuffledDirections[index];
+    Object.keys(dynamicColors).forEach((color, index) => {
+      if (index < shuffledDirections.length) {
+        newColorMap[color] = shuffledDirections[index];
+      }
     });
     setColorMap(newColorMap);
     toast.info("Color mapping has been randomized!");
@@ -152,7 +202,7 @@ export function CreatePotPage() {
       toast.error("Please connect your wallet first.");
       return;
     }
-    if (!password || Object.keys(colorMap).length < MAPPABLE_DIRECTIONS.length) {
+    if (!password || Object.keys(colorMap).length < mappableDirections.length) {
       toast.error("Please complete all fields in the previous steps.");
       return;
     }
@@ -523,7 +573,12 @@ export function CreatePotPage() {
                               Randomize
                             </Button>
                           </div>
-                          <ColorDirectionMapper colorMap={colorMap} setColorMap={setColorMap} />
+                          <ColorDirectionMapper 
+                            colorMap={colorMap} 
+                            setColorMap={setColorMap} 
+                            colors={dynamicColors}
+                            directions={mappableDirections}
+                          />
                         </div>
                       </CardContent>
                     </div>
@@ -561,7 +616,7 @@ export function CreatePotPage() {
                           </li>
                           <li className="flex justify-between"><span>1FA Address:</span> <span className="font-mono text-xs">{oneFaAddress ? `${oneFaAddress.slice(0,10)}...` : "Will be auto-generated"}</span></li>
                         </ul>
-                        <Button onClick={handleCreatePot} disabled={isSubmitting || !connected || !password || Object.keys(colorMap).length < MAPPABLE_DIRECTIONS.length} className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg py-6">
+                        <Button onClick={handleCreatePot} disabled={isSubmitting || !connected || !password || Object.keys(colorMap).length < mappableDirections.length} className="w-full bg-brand-green hover:bg-brand-green/90 text-white font-bold text-lg py-6">
                           {isSubmitting ? <Loader2 className="mr-2 h-6 w-6 animate-spin" /> : `Deposit ${amount} USDC & Create Pot`}
                         </Button>
                       </CardContent>
