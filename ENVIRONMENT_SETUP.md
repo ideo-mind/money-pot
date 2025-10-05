@@ -50,7 +50,7 @@ APTOS_NODE_URL=https://fullnode.testnet.aptoslabs.com/v1
 MONEY_POT_CONTRACT_ADDRESS=0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f
 
 # Verifier Service Configuration
-VERIFIER_SERVICE_URL=http://localhost:8787
+MONEY_AUTH_URL=http://localhost:8787
 VERIFIER_SERVICE_BASE_URL=/api
 
 # USDC Token Configuration
@@ -62,9 +62,9 @@ USDC_TOKEN_ADDRESS=0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01
 Development environment variables for Vite:
 
 ```bash
-VITE_APTOS_NODE_URL=https://fullnode.testnet.aptoslabs.com/v1
+APTOS_NODE_URL=https://fullnode.testnet.aptoslabs.com/v1
 VITE_MONEY_POT_CONTRACT_ADDRESS=0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f
-VITE_VERIFIER_SERVICE_URL=http://localhost:8787
+MONEY_AUTH_URL=http://localhost:8787
 VITE_VERIFIER_SERVICE_BASE_URL=/api
 VITE_USDC_TOKEN_ADDRESS=0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17da
 ```
@@ -152,9 +152,9 @@ node test-integration.js
 
 ### Frontend (Vite) Variables
 
-- `VITE_APTOS_NODE_URL` - Aptos RPC endpoint
+- `APTOS_NODE_URL` - Aptos RPC endpoint
 - `VITE_MONEY_POT_CONTRACT_ADDRESS` - Smart contract address
-- `VITE_VERIFIER_SERVICE_URL` - Verifier service URL
+- `MONEY_AUTH_URL` - Verifier service URL
 - `VITE_VERIFIER_SERVICE_BASE_URL` - API base path
 - `VITE_USDC_TOKEN_ADDRESS` - USDC token contract address
 
@@ -162,7 +162,7 @@ node test-integration.js
 
 - `APTOS_NODE_URL` - Aptos RPC endpoint
 - `MONEY_POT_CONTRACT_ADDRESS` - Smart contract address
-- `VERIFIER_SERVICE_URL` - Verifier service URL
+- `MONEY_AUTH_URL` - Verifier service URL
 - `USDC_TOKEN_ADDRESS` - USDC token contract address
 - `NODE_ENV` - Environment (development/production)
 

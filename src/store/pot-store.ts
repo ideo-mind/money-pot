@@ -42,36 +42,38 @@ export const transformToPot = (onChainPot: any): Pot => {
   const entryFee = Number(onChainPot.fee) / 1_000_000;
   const potentialReward = totalValue * 0.4;
   
-  // Handle different possible formats for expires_at
   let expiresAt: Date;
+
   try {
-    if (typeof onChainPot.expires_at === 'string') {
-      // If it's already a string, try to parse it directly
-      expiresAt = new Date(onChainPot.expires_at);
-    } else if (typeof onChainPot.expires_at === 'number') {
-      // If it's a number, assume it's Unix timestamp in seconds
-      expiresAt = new Date(onChainPot.expires_at * 1000);
-    } else if (onChainPot.expires_at && typeof onChainPot.expires_at.toString === 'function') {
-      // If it's a BigInt or other object, convert to string first
-      const timestamp = parseInt(onChainPot.expires_at.toString());
-      expiresAt = new Date(timestamp * 1000);
+    const raw = onChainPot.expires_at;
+    let timestamp: number;
+
+    if (raw == null) throw new Error('Missing expires_at');
+
+    // Normalize possible formats
+    if (typeof raw === 'string') {
+      // Try to parse as ISO string; if it’s numeric, handle as seconds
+      timestamp = isNaN(Number(raw)) ? Date.parse(raw) : Number(raw);
+    } else if (typeof raw === 'bigint') {
+      timestamp = Number(raw);
+    } else if (typeof raw === 'number') {
+      timestamp = raw;
     } else {
-      // Fallback: assume it's already a valid timestamp
-      expiresAt = new Date(onChainPot.expires_at);
+      timestamp = Number(raw.toString());
     }
-    
-    // Validate the date
-    if (isNaN(expiresAt.getTime())) {
-      console.warn('Invalid expiration date for pot:', onChainPot.id, 'expires_at:', onChainPot.expires_at);
-      // Set a default expiration time (24 hours from now)
-      expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    }
+
+    // If timestamp looks like seconds instead of ms, multiply
+    if (timestamp < 1e12) timestamp *= 1000;
+
+    expiresAt = new Date(timestamp);
+
+    console.log('expiresAt parsed:', expiresAt.toISOString());
   } catch (error) {
     console.error('Error parsing expiration date:', error);
-    // Set a default expiration time (24 hours from now)
-    expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // fallback: +24h
+    expiresAt = new Date(Date.now() + 86_400_000);
   }
-  
+
   const isExpired = expiresAt < new Date();
   const timeLeft = isExpired
     ? `Expired ${formatDistanceToNowStrict(expiresAt, { addSuffix: true })}`
@@ -84,7 +86,7 @@ export const transformToPot = (onChainPot: any): Pot => {
     total_usdc: onChainPot.total_amount.toString(),
     entry_fee: onChainPot.fee.toString(),
     created_at: onChainPot.created_at.toString(),
-    expires_at: onChainPot.expires_at.toString(),
+    expires_at: expiresAt, // Store the converted Date object
     is_active: onChainPot.is_active,
     attempts_count: onChainPot.attempts_count.toString(),
     one_fa_address: onChainPot.one_fa_address.toString(),
@@ -114,7 +116,18 @@ const loadAttemptsFromStorage = (): Attempt[] => {
 const loadPotsFromStorage = (): Record<string, Pot> => {
   try {
     const storedPots = localStorage.getItem(POTS_STORAGE_KEY);
-    return storedPots ? JSON.parse(storedPots) : {};
+    if (!storedPots) return {};
+    
+    const parsedPots = JSON.parse(storedPots) as Record<string, any>;
+    // Convert expires_at ISO strings back to Date objects
+    const convertedPots: Record<string, Pot> = {};
+    for (const [key, pot] of Object.entries(parsedPots)) {
+      convertedPots[key] = {
+        ...pot,
+        expires_at: new Date(pot.expires_at)
+      } as Pot;
+    }
+    return convertedPots;
   } catch (error) {
     console.error("Failed to load pots from local storage:", error);
     return {};
@@ -145,6 +158,7 @@ const loadMetadataFromStorage = (): PotMetadata | null => {
 const convertBigIntToString = (obj: any): any => {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'bigint') return obj.toString();
+  if (obj instanceof Date) return obj.toISOString(); // Convert Date to ISO string for storage
   if (Array.isArray(obj)) return obj.map(convertBigIntToString);
   if (typeof obj === 'object') {
     const converted: any = {};

@@ -4,7 +4,7 @@ export interface Pot {
   total_usdc: string; // u64 can be large, use string
   entry_fee: string; // u64 can be large, use string
   created_at: string; // u64 can be large, use string
-  expires_at: string; // u64 can be large, use string
+  expires_at: Date; // Converted to Date object for proper handling
   is_active: boolean;
   attempts_count: string; // u64 can be large, use string
   one_fa_address: string;

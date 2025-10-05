@@ -8,7 +8,7 @@
 // Load environment variables
 require('dotenv').config({ path: './development.env' });
 
-const BASE_URL = process.env.VITE_VERIFIER_SERVICE_URL || 'http://localhost:8787';
+const BASE_URL = process.env.MONEY_AUTH_URL || 'http://localhost:8787';
 const CONTRACT_ADDRESS = process.env.VITE_MONEY_POT_CONTRACT_ADDRESS || '0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f';
 
 async function testVerifierService() {
