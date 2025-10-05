@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -14,6 +14,8 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
   const [selectedLayout, setSelectedLayout] = useState<'orb' | 'pizza' | 'honeycomb' | 'spiral' | 'unicode'>('orb');
   const [hoveredChar, setHoveredChar] = useState<string | null>(null);
   const [searchChar, setSearchChar] = useState<string>('');
+  const [spiralAnimation, setSpiralAnimation] = useState<'expanding' | 'contracting' | 'static'>('expanding');
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
 
   const getColorClass = (color: string, isHovered: boolean = false, isHighlighted: boolean = false) => {
     const opacity = isHovered || isHighlighted ? '100' : '90';
@@ -44,7 +46,7 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
     return 'gray';
   };
 
-  // 2D Orb Layout - Characters arranged in a circular pattern
+  // 2D Orb Layout - Characters arranged in a circular pattern with hover expansion
   const OrbLayout = () => {
     const gridChars = challenge.grid.split('');
     const radius = 200;
@@ -74,32 +76,38 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
           {sections.map((color, sectionIndex) => {
             const startAngle = sectionIndex * anglePerSection - Math.PI / 2;
             const endAngle = (sectionIndex + 1) * anglePerSection - Math.PI / 2;
+            const isHovered = hoveredSection === color;
 
-            const x1 = centerX + radius * Math.cos(startAngle);
-            const y1 = centerY + radius * Math.sin(startAngle);
-            const x2 = centerX + radius * Math.cos(endAngle);
-            const y2 = centerY + radius * Math.sin(endAngle);
+            const expandedRadius = isHovered ? radius * 1.1 : radius;
+            const x1 = centerX + expandedRadius * Math.cos(startAngle);
+            const y1 = centerY + expandedRadius * Math.sin(startAngle);
+            const x2 = centerX + expandedRadius * Math.cos(endAngle);
+            const y2 = centerY + expandedRadius * Math.sin(endAngle);
 
             const pathData = `
               M ${centerX} ${centerY}
               L ${x1} ${y1}
-              A ${radius} ${radius} 0 0 1 ${x2} ${y2}
+              A ${expandedRadius} ${expandedRadius} 0 0 1 ${x2} ${y2}
               Z
             `;
 
             return (
-              <path
-                key={color}
-                d={pathData}
-                fill={color === 'red' ? '#fee2e2' :
-                      color === 'green' ? '#dcfce7' :
-                      color === 'blue' ? '#dbeafe' : '#fef3c7'}
-                opacity="0.3"
-                stroke={color === 'red' ? '#ef4444' :
-                        color === 'green' ? '#22c55e' :
-                        color === 'blue' ? '#3b82f6' : '#eab308'}
-                strokeWidth="2"
-              />
+              <g key={color}>
+                <path
+                  d={pathData}
+                  fill={color === 'red' ? '#fee2e2' :
+                        color === 'green' ? '#dcfce7' :
+                        color === 'blue' ? '#dbeafe' : '#fef3c7'}
+                  opacity={isHovered ? "0.5" : "0.3"}
+                  stroke={color === 'red' ? '#ef4444' :
+                          color === 'green' ? '#22c55e' :
+                          color === 'blue' ? '#3b82f6' : '#eab308'}
+                  strokeWidth={isHovered ? "3" : "2"}
+                  style={{ transition: 'all 0.3s ease' }}
+                  onMouseEnter={() => setHoveredSection(color)}
+                  onMouseLeave={() => setHoveredSection(null)}
+                />
+              </g>
             );
           })}
 
@@ -108,19 +116,23 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
             const chars = colorSections[color] || [];
             const startAngle = sectionIndex * anglePerSection - Math.PI / 2;
             const sectionAngle = anglePerSection;
+            const isHovered = hoveredSection === color;
+            const radiusFactor = isHovered ? 1.15 : 1;
 
             return chars.map((char, charIndex) => {
-              const charRadius = radius * (0.5 + (charIndex / chars.length) * 0.4);
+              const charRadius = radius * (0.5 + (charIndex / chars.length) * 0.4) * radiusFactor;
               const charAngle = startAngle + (sectionAngle * (charIndex + 0.5) / chars.length);
               const x = centerX + charRadius * Math.cos(charAngle);
               const y = centerY + charRadius * Math.sin(charAngle);
 
               return (
-                <g key={`${color}-${charIndex}`}>
+                <g key={`${color}-${charIndex}`}
+                   onMouseEnter={() => setHoveredSection(color)}
+                   onMouseLeave={() => setHoveredSection(null)}>
                   <circle
                     cx={x}
                     cy={y}
-                    r="20"
+                    r={isHovered ? "24" : "20"}
                     className={getColorClass(color, hoveredChar === char, searchChar === char)}
                     style={{ transition: 'all 0.3s ease' }}
                   />
@@ -128,7 +140,8 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
                     x={x}
                     y={y + 7}
                     textAnchor="middle"
-                    className="text-2xl font-bold fill-white cursor-pointer select-none"
+                    className={`${isHovered ? 'text-3xl' : 'text-2xl'} font-bold fill-white cursor-pointer select-none`}
+                    style={{ transition: 'all 0.3s ease' }}
                     onMouseEnter={() => setHoveredChar(char)}
                     onMouseLeave={() => setHoveredChar(null)}
                   >
@@ -140,30 +153,11 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
           })}
         </svg>
 
-        {/* Color Legend */}
-        <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-4 text-xs">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span>Up</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span>Down</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span>Left</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span>Right</span>
-          </div>
-        </div>
       </div>
     );
   };
 
-  // Pizza Slice Layout - Characters arranged in pizza-like slices
+  // Pizza Slice Layout - Characters arranged in pizza-like slices (expanded to fit all)
   const PizzaLayout = () => {
     const gridChars = challenge.grid.split('');
     const colors = ['red', 'green', 'blue', 'yellow'];
@@ -180,39 +174,51 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
     });
 
     return (
-      <div className="relative w-[500px] h-[500px] mx-auto">
-        <div className="absolute inset-0 rounded-full overflow-hidden border-4 border-amber-400 shadow-2xl">
+      <div className="relative w-[550px] h-[550px] mx-auto">
+        <div className="absolute inset-0 rounded-full overflow-hidden border-4 border-amber-400 shadow-2xl bg-amber-50">
           {colors.map((color, index) => {
             const rotation = index * 90;
             const chars = colorSections[color];
+            const isHovered = hoveredSection === color;
 
             return (
               <div
                 key={color}
                 className="absolute inset-0"
-                style={{ transform: `rotate(${rotation}deg)` }}
+                style={{
+                  transform: `rotate(${rotation}deg) ${isHovered ? 'scale(1.05)' : 'scale(1)'}`,
+                  transition: 'transform 0.3s ease',
+                  zIndex: isHovered ? 10 : 1
+                }}
+                onMouseEnter={() => setHoveredSection(color)}
+                onMouseLeave={() => setHoveredSection(null)}
               >
                 <div className="absolute top-0 left-1/2 w-1/2 h-1/2 origin-bottom-left">
                   <div className={`w-full h-full bg-gradient-to-tr ${
-                    color === 'red' ? 'from-red-100 to-red-200' :
-                    color === 'green' ? 'from-green-100 to-green-200' :
-                    color === 'blue' ? 'from-blue-100 to-blue-200' :
-                    'from-yellow-100 to-yellow-200'
-                  } border-r-2 border-b-2 border-white`}>
-                    <div className="flex flex-wrap gap-2 p-4 justify-center items-center h-full">
-                      {chars.map((char, charIndex) => (
-                        <div
-                          key={charIndex}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg transform transition-all duration-200 cursor-pointer ${
-                            getColorClass(color, hoveredChar === char, searchChar === char)
-                          }`}
-                          style={{ transform: `rotate(-${rotation}deg)` }}
-                          onMouseEnter={() => setHoveredChar(char)}
-                          onMouseLeave={() => setHoveredChar(null)}
-                        >
-                          {char}
-                        </div>
-                      ))}
+                    color === 'red' ? 'from-red-50 to-red-100' :
+                    color === 'green' ? 'from-green-50 to-green-100' :
+                    color === 'blue' ? 'from-blue-50 to-blue-100' :
+                    'from-yellow-50 to-yellow-100'
+                  } border-r-2 border-b-2 border-white ${isHovered ? 'opacity-100' : 'opacity-80'}`}>
+                    <div className="p-3 h-full overflow-visible">
+                      <div className={`grid ${chars.length > 12 ? 'grid-cols-4' : chars.length > 6 ? 'grid-cols-3' : 'grid-cols-2'} gap-1`}>
+                        {chars.map((char, charIndex) => (
+                          <div
+                            key={charIndex}
+                            className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-base transform transition-all duration-200 cursor-pointer ${
+                              getColorClass(color, hoveredChar === char, searchChar === char)
+                            } ${isHovered ? 'scale-110' : 'scale-100'}`}
+                            style={{
+                              transform: `rotate(-${rotation}deg)`,
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={() => setHoveredChar(char)}
+                            onMouseLeave={() => setHoveredChar(null)}
+                          >
+                            {char}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -221,47 +227,74 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
           })}
 
           {/* Center circle with pizza icon */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-white rounded-full border-4 border-amber-400 flex items-center justify-center">
-            <Pizza className="w-10 h-10 text-amber-600" />
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-white rounded-full border-4 border-amber-400 flex items-center justify-center z-20">
+            <Pizza className="w-12 h-12 text-amber-600" />
           </div>
         </div>
       </div>
     );
   };
 
-  // Honeycomb Layout - Hexagonal grid pattern
+  // Honeycomb Layout - Hexagonal grid pattern with colored backgrounds
   const HoneycombLayout = () => {
     const gridChars = challenge.grid.split('');
-    const hexSize = 35;
+    const hexSize = 40;
     const hexHeight = hexSize * 2;
     const hexWidth = Math.sqrt(3) * hexSize;
 
     return (
-      <div className="flex flex-wrap justify-center gap-1 max-w-[600px] mx-auto">
+      <div className="flex flex-wrap justify-center max-w-[700px] mx-auto" style={{ gap: '2px' }}>
         {gridChars.map((char: string, index: number) => {
           const color = getCharColor(char);
-          const row = Math.floor(index / 8);
-          const col = index % 8;
-          const offset = row % 2 === 0 ? 0 : hexWidth / 2;
+          const row = Math.floor(index / 7);
+          const isEvenRow = row % 2 === 0;
+
+          // Get the background color with opacity
+          const bgColor = color === 'red' ? 'rgba(239, 68, 68, 0.15)' :
+                         color === 'green' ? 'rgba(34, 197, 94, 0.15)' :
+                         color === 'blue' ? 'rgba(59, 130, 246, 0.15)' :
+                         color === 'yellow' ? 'rgba(234, 179, 8, 0.15)' :
+                         'rgba(107, 114, 128, 0.15)';
+
+          const borderColor = color === 'red' ? '#ef4444' :
+                             color === 'green' ? '#22c55e' :
+                             color === 'blue' ? '#3b82f6' :
+                             color === 'yellow' ? '#eab308' :
+                             '#6b7280';
 
           return (
             <div
               key={index}
-              className={`relative ${row % 2 === 0 ? '' : 'ml-[30px]'}`}
-              style={{ width: `${hexWidth}px`, height: `${hexHeight}px` }}
+              className={`relative ${isEvenRow ? '' : 'ml-[35px]'}`}
+              style={{ width: `${hexWidth}px`, height: `${hexHeight}px`, marginTop: row > 0 ? '-20px' : '0' }}
             >
               <div className="absolute inset-0">
                 <svg viewBox="0 0 100 100" className="w-full h-full">
                   <polygon
                     points="50,5 90,25 90,75 50,95 10,75 10,25"
-                    className={getColorClass(color, hoveredChar === char, searchChar === char)}
+                    fill={bgColor}
+                    stroke={borderColor}
+                    strokeWidth="2"
+                    className={`${hoveredChar === char || searchChar === char ? 'filter brightness-150' : ''}`}
                     style={{ transition: 'all 0.3s ease' }}
                   />
                   <text
                     x="50"
-                    y="55"
+                    y="56"
                     textAnchor="middle"
-                    className="text-3xl font-bold fill-white cursor-pointer select-none"
+                    className={`text-3xl font-bold cursor-pointer select-none ${
+                      hoveredChar === char || searchChar === char ? 'fill-white' :
+                      color === 'red' ? 'fill-red-700' :
+                      color === 'green' ? 'fill-green-700' :
+                      color === 'blue' ? 'fill-blue-700' :
+                      color === 'yellow' ? 'fill-yellow-700' :
+                      'fill-gray-700'
+                    }`}
+                    style={{
+                      transition: 'all 0.3s ease',
+                      transform: hoveredChar === char || searchChar === char ? 'scale(1.2)' : 'scale(1)',
+                      transformOrigin: '50px 50px'
+                    }}
                     onMouseEnter={() => setHoveredChar(char)}
                     onMouseLeave={() => setHoveredChar(null)}
                   >
@@ -276,19 +309,39 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
     );
   };
 
-  // Spiral Layout - Characters in a spiral pattern
+  // Spiral Layout - Characters in a spiral pattern with animation
   const SpiralLayout = () => {
     const gridChars = challenge.grid.split('');
     const centerX = 250;
     const centerY = 250;
-    const spiralGrowth = 15;
+    const baseGrowth = 15;
+
+    // Animation cycle effect
+    useEffect(() => {
+      if (selectedLayout === 'spiral') {
+        const timer = setTimeout(() => {
+          if (spiralAnimation === 'expanding') {
+            setSpiralAnimation('contracting');
+          } else if (spiralAnimation === 'contracting') {
+            setSpiralAnimation('static');
+          } else {
+            setSpiralAnimation('expanding');
+          }
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }, [spiralAnimation, selectedLayout]);
+
+    const animationFactor = spiralAnimation === 'expanding' ? 1.2 :
+                           spiralAnimation === 'contracting' ? 0.8 : 1;
 
     return (
       <div className="relative w-[500px] h-[500px] mx-auto">
         <svg viewBox="0 0 500 500" className="w-full h-full">
           {gridChars.map((char: string, index: number) => {
             const angle = index * 0.5;
-            const radius = spiralGrowth * Math.sqrt(index);
+            const baseRadius = baseGrowth * Math.sqrt(index);
+            const radius = baseRadius * animationFactor;
             const x = centerX + radius * Math.cos(angle);
             const y = centerY + radius * Math.sin(angle);
             const color = getCharColor(char);
@@ -299,14 +352,20 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
                   cx={x}
                   cy={y}
                   r="22"
-                  className={getColorClass(color, hoveredChar === char)}
-                  style={{ transition: 'all 0.3s ease' }}
+                  className={getColorClass(color, hoveredChar === char, searchChar === char)}
+                  style={{
+                    transition: 'all 2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    opacity: spiralAnimation === 'static' ? 1 : 0.9
+                  }}
                 />
                 <text
                   x={x}
                   y={y + 7}
                   textAnchor="middle"
                   className="text-xl font-bold fill-white cursor-pointer select-none"
+                  style={{
+                    transition: 'all 2s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }}
                   onMouseEnter={() => setHoveredChar(char)}
                   onMouseLeave={() => setHoveredChar(null)}
                 >
@@ -348,25 +407,17 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
         {Object.entries(colorGroups).map(([color, chars]) => {
           if (chars.length === 0) return null;
 
-          const directionMap: {[key: string]: string} = {
-            red: 'Up (↑)',
-            green: 'Down (↓)',
-            blue: 'Left (←)',
-            yellow: 'Right (→)'
-          };
-
           return (
             <div key={color} className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded ${
+                <div className={`w-6 h-6 rounded-full ${
                   color === 'red' ? 'bg-red-500' :
                   color === 'green' ? 'bg-green-500' :
                   color === 'blue' ? 'bg-blue-500' :
                   'bg-yellow-500'
                 }`}></div>
-                <span className="font-semibold text-lg">{directionMap[color]}</span>
                 <span className="text-sm text-muted-foreground">
-                  ({chars.length} characters)
+                  {chars.length} characters
                 </span>
               </div>
 
@@ -441,16 +492,12 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
             {(() => {
               const color = getCharColor(searchChar);
               return color !== 'gray' ? (
-                <span className={`ml-2 px-2 py-1 rounded text-white text-xs ${
+                <span className={`ml-2 w-4 h-4 inline-block rounded-full ${
                   color === 'red' ? 'bg-red-500' :
                   color === 'green' ? 'bg-green-500' :
                   color === 'blue' ? 'bg-blue-500' :
                   color === 'yellow' ? 'bg-yellow-500' : ''
                 }`}>
-                  {color === 'red' ? 'Up (↑)' :
-                   color === 'green' ? 'Down (↓)' :
-                   color === 'blue' ? 'Left (←)' :
-                   color === 'yellow' ? 'Right (→)' : ''}
                 </span>
               ) : (
                 <span className="ml-2 text-xs text-muted-foreground">Not found in grid</span>
@@ -502,18 +549,13 @@ export function AuthenticationDisplay({ challenge, isTransitioning = false }: Au
             <div className="text-sm text-muted-foreground">
               Unicode: {hoveredChar.charCodeAt(0)}
             </div>
-            <div className={`mt-2 px-3 py-1 rounded-full text-white text-sm font-semibold ${
+            <div className={`mt-2 w-8 h-8 mx-auto rounded-full ${
               getCharColor(hoveredChar) === 'red' ? 'bg-red-500' :
               getCharColor(hoveredChar) === 'green' ? 'bg-green-500' :
               getCharColor(hoveredChar) === 'blue' ? 'bg-blue-500' :
               getCharColor(hoveredChar) === 'yellow' ? 'bg-yellow-500' :
               'bg-gray-500'
             }`}>
-              {getCharColor(hoveredChar) === 'red' ? 'Up (↑)' :
-               getCharColor(hoveredChar) === 'green' ? 'Down (↓)' :
-               getCharColor(hoveredChar) === 'blue' ? 'Left (←)' :
-               getCharColor(hoveredChar) === 'yellow' ? 'Right (→)' :
-               'Unknown'}
             </div>
           </div>
         </div>
