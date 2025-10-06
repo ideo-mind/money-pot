@@ -186,10 +186,7 @@ export function CreatePotPage() {
     });
   };
   const handleEntryFeeChange = (value: number) => {
-    const minFee = 0.0001;
-    const maxFee = amount > 0 ? amount / 100 : 0.01;
-    const clampedValue = Math.max(minFee, Math.min(value, maxFee));
-    setEntryFee(clampedValue);
+    setEntryFee(value);
   };
   const randomizeColorMap = () => {
     const shuffledDirections = [...mappableDirections];
@@ -567,12 +564,10 @@ export function CreatePotPage() {
                                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">$</span>
                                 <Input
                                   type="number"
-                                  value={entryFee.toFixed(4)}
+                                  value={entryFee}
                                   onChange={(e) => handleEntryFeeChange(parseFloat(e.target.value) || 0)}
-                                  min={0.0001}
-                                  step={0.0001}
                                   className="w-40 pl-8"
-                                  placeholder="0.0000"
+                                  placeholder="0.00"
                                 />
                               </div>
                               <div className="text-sm text-muted-foreground">
@@ -593,7 +588,7 @@ export function CreatePotPage() {
                                   onClick={() => handleEntryFeeChange(amount / 1000)}
                                   className="text-xs"
                                 >
-                                  {(amount / 1000).toFixed(4)}
+                                  {(amount / 1000).toFixed(2)}
                                 </Button>
                                 <Button 
                                   variant="outline" 
@@ -601,7 +596,7 @@ export function CreatePotPage() {
                                   onClick={() => handleEntryFeeChange(amount / 500)}
                                   className="text-xs"
                                 >
-                                  {(amount / 500).toFixed(4)}
+                                  {(amount / 500).toFixed(2)}
                                 </Button>
                                 <Button 
                                   variant="outline" 
@@ -609,7 +604,7 @@ export function CreatePotPage() {
                                   onClick={() => handleEntryFeeChange(amount / 100)}
                                   className="text-xs"
                                 >
-                                  {(amount / 100).toFixed(4)}
+                                  {(amount / 100).toFixed(2)}
                                 </Button>
                                 <Button 
                                   variant="outline" 
@@ -617,7 +612,7 @@ export function CreatePotPage() {
                                   onClick={() => handleEntryFeeChange(amount / 50)}
                                   className="text-xs"
                                 >
-                                  {(amount / 50).toFixed(4)}
+                                  {(amount / 50).toFixed(2)}
                                 </Button>
                                 <Button 
                                   variant="outline" 
@@ -625,7 +620,7 @@ export function CreatePotPage() {
                                   onClick={() => handleEntryFeeChange(amount / 20)}
                                   className="text-xs"
                                 >
-                                  {(amount / 20).toFixed(4)}
+                                  {(amount / 20).toFixed(2)}
                                 </Button>
                                 <Button 
                                   variant="outline" 
@@ -633,7 +628,7 @@ export function CreatePotPage() {
                                   onClick={() => handleEntryFeeChange(amount / 10)}
                                   className="text-xs"
                                 >
-                                  {(amount / 10).toFixed(4)}
+                                  {(amount / 10).toFixed(2)}
                                 </Button>
                               </div>
                             </div>
