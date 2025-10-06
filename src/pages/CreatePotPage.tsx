@@ -561,24 +561,83 @@ export function CreatePotPage() {
                       <CardContent className="space-y-6">
                         <div className="space-y-4">
                           <Label>Entry Fee (USDC)</Label>
-                          <div className="flex items-center gap-4">
-                            <Input
-                              type="number"
-                              value={entryFee}
-                              onChange={(e) => handleEntryFeeChange(parseFloat(e.target.value) || 0)}
-                              min={0.0001}
-                              step={0.01}
-                              className="w-32"
-                            />
-                            <Slider
-                              value={[entryFee]}
-                              onValueChange={(val) => handleEntryFeeChange(val[0])}
-                              min={Math.max(0.0001, amount / 1000)}
-                              max={amount / 100}
-                              step={0.01}
-                            />
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-4">
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">$</span>
+                                <Input
+                                  type="number"
+                                  value={entryFee.toFixed(4)}
+                                  onChange={(e) => handleEntryFeeChange(parseFloat(e.target.value) || 0)}
+                                  min={0.0001}
+                                  step={0.0001}
+                                  className="w-40 pl-8"
+                                  placeholder="0.0000"
+                                />
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {amount > 0 && (
+                                  <span>
+                                    ({(entryFee / amount * 100).toFixed(2)}% of pot)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <p className="text-sm text-muted-foreground">Quick presets:</p>
+                              <div className="flex flex-wrap gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEntryFeeChange(amount / 1000)}
+                                  className="text-xs"
+                                >
+                                  {(amount / 1000).toFixed(4)}
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEntryFeeChange(amount / 500)}
+                                  className="text-xs"
+                                >
+                                  {(amount / 500).toFixed(4)}
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEntryFeeChange(amount / 100)}
+                                  className="text-xs"
+                                >
+                                  {(amount / 100).toFixed(4)}
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEntryFeeChange(amount / 50)}
+                                  className="text-xs"
+                                >
+                                  {(amount / 50).toFixed(4)}
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEntryFeeChange(amount / 20)}
+                                  className="text-xs"
+                                >
+                                  {(amount / 20).toFixed(4)}
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleEntryFeeChange(amount / 10)}
+                                  className="text-xs"
+                                >
+                                  {(amount / 10).toFixed(4)}
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-sm text-muted-foreground">Auto-calculated as 1/100th of the pot amount. You can adjust between 1/1000th and 1/100th.</p>
                         </div>
                         <div className="space-y-2">
                           <Label>1FA Key Pair (Optional)</Label>
