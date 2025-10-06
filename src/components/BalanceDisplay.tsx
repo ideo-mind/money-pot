@@ -111,80 +111,46 @@ export function BalanceDisplay() {
   const needsUsdc = balances.usdc !== null && balances.usdc < 1;
 
   return (
-    <div className="space-y-3">
-      {/* Balance Display */}
-      <div className="flex gap-2">
-        <div className="flex items-center gap-2 text-sm font-medium bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-md">
-          <Coins className="w-4 h-4 text-brand-gold" />
-          <span>{typeof balances.aptos === 'number' ? balances.aptos.toFixed(4) : '0.0000'} APT</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm font-medium bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-md">
-          <Coins className="w-4 h-4 text-blue-500" />
-          <span>{typeof balances.usdc === 'number' ? balances.usdc.toFixed(2) : '0.00'} USDC</span>
-        </div>
+    <div className="flex items-center gap-2">
+      {/* Compact Balance Display */}
+      <div className="flex items-center gap-1 text-xs font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+        <Coins className="w-3 h-3 text-brand-gold" />
+        <span>{typeof balances.aptos === 'number' ? balances.aptos.toFixed(2) : '0.00'} APT</span>
+      </div>
+      <div className="flex items-center gap-1 text-xs font-medium bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+        <Coins className="w-3 h-3 text-blue-500" />
+        <span>{typeof balances.usdc === 'number' ? balances.usdc.toFixed(2) : '0.00'} USDC</span>
       </div>
 
-      {/* Faucet Alerts */}
+      {/* Compact Faucet Alerts */}
       {(needsAptos || needsUsdc) && (
-        <Alert className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
-          <AlertTriangle className="h-4 w-4 text-orange-600" />
-          <AlertDescription className="text-sm">
-            <div className="space-y-2">
-              <p className="font-medium text-orange-800 dark:text-orange-200">
-                Low balance detected! Get testnet tokens:
-              </p>
-              <div className="space-y-3">
-                {needsAptos && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(`https://aptos.dev/network/faucet?address=${account?.address?.toString()}`, '_blank')}
-                        className="text-xs border-orange-300 hover:bg-orange-100 dark:border-orange-700 dark:hover:bg-orange-900"
-                      >
-                        <ExternalLink className="w-3 h-3 mr-1" />
-                        Get APTOS
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground">Address:</span>
-                      <code className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-xs font-mono">
-                        {account?.address?.toString()}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          navigator.clipboard.writeText(account?.address?.toString() || '');
-                          // You could add a toast notification here if you have one
-                        }}
-                        className="h-6 w-6 p-0 hover:bg-orange-100 dark:hover:bg-orange-900"
-                      >
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {needsUsdc && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open('https://faucet.circle.com', '_blank')}
-                      className="text-xs border-orange-300 hover:bg-orange-100 dark:border-orange-700 dark:hover:bg-orange-900"
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Get USDC (Aptos Testnet)
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3 text-orange-500" />
+          <div className="flex gap-1">
+            {needsAptos && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://aptos.dev/network/faucet?address=${account?.address?.toString()}`, '_blank')}
+                className="text-xs h-6 px-2 border-orange-300 hover:bg-orange-100 dark:border-orange-700 dark:hover:bg-orange-900"
+              >
+                <ExternalLink className="w-3 h-3 mr-1" />
+                APT
+              </Button>
+            )}
+            {needsUsdc && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open('https://faucet.circle.com', '_blank')}
+                className="text-xs h-6 px-2 border-orange-300 hover:bg-orange-100 dark:border-orange-700 dark:hover:bg-orange-900"
+              >
+                <ExternalLink className="w-3 h-3 mr-1" />
+                USDC
+              </Button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
