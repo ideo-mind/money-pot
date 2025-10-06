@@ -1,6 +1,6 @@
 import { Link, Outlet } from "react-router-dom";
 import { WalletConnectButton } from "./WalletConnectButton";
-import { UserBalance } from "./UserBalance";
+import { BalanceDisplay } from "./BalanceDisplay";
 import { TransactionLog } from "./TransactionLog";
 import logoImage from "/logo.png";
 export function Layout() {
@@ -30,7 +30,7 @@ export function Layout() {
               </Link>
             </nav>
             <div className="flex items-center gap-4">
-              <UserBalance />
+              <BalanceDisplay />
               <WalletConnectButton />
             </div>
           </div>
