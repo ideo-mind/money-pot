@@ -458,7 +458,7 @@ export function CreatePotPage() {
                             
                             <div className="text-xs text-muted-foreground">
                               <p>💡 Quick presets:</p>
-                              <div className="flex gap-2 mt-1">
+                              <div className="flex flex-wrap gap-2 mt-1">
                                 <Button 
                                   variant="outline" 
                                   size="sm" 
@@ -491,6 +491,50 @@ export function CreatePotPage() {
                                   }}
                                 >
                                   1 day
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const date = new Date();
+                                    date.setDate(date.getDate() + 30);
+                                    setCustomEndDate(date);
+                                  }}
+                                >
+                                  30 days
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const date = new Date();
+                                    date.setMonth(date.getMonth() + 6);
+                                    setCustomEndDate(date);
+                                  }}
+                                >
+                                  6 months
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const date = new Date();
+                                    date.setFullYear(date.getFullYear() + 1);
+                                    setCustomEndDate(date);
+                                  }}
+                                >
+                                  1 year
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => {
+                                    const date = new Date();
+                                    date.setFullYear(date.getFullYear() + 10);
+                                    setCustomEndDate(date);
+                                  }}
+                                >
+                                  10 years
                                 </Button>
                               </div>
                             </div>

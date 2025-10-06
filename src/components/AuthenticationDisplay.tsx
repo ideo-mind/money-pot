@@ -13,7 +13,7 @@ interface AuthenticationDisplayProps {
 }
 
 export function AuthenticationDisplay({ challenge, isTransitioning = false, colors = {}, directions = {} }: AuthenticationDisplayProps) {
-  const [selectedLayout, setSelectedLayout] = useState<'orb' | 'pizza' | 'honeycomb' | 'spiral' | 'unicode'>('orb');
+  const [selectedLayout, setSelectedLayout] = useState<'orb' | 'pizza' | 'honeycomb' | 'spiral' | 'unicode'>('honeycomb');
   const [hoveredChar, setHoveredChar] = useState<string | null>(null);
   const [searchChar, setSearchChar] = useState<string>('');
   const [spiralAnimation, setSpiralAnimation] = useState<'expanding' | 'contracting' | 'static'>('expanding');
