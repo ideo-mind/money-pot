@@ -24,49 +24,54 @@ export function BalanceDisplay() {
   useEffect(() => {
     const fetchBalances = async () => {
       if (account?.address) {
+        console.log("Fetching balances for address:", account.address.toString());
         setBalances(prev => ({ ...prev, loading: true }));
         try {
           const resources = await aptos.getAccountResources({ accountAddress: account.address });
+          console.log("Account resources:", resources);
           
-          // Get APTOS balance
-          const aptosCoinResource = resources.find(
-            (r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-          );
+          // Get APTOS balance using the SDK's built-in function
           let aptosBalance = 0;
-          if (aptosCoinResource && aptosCoinResource.data) {
-            const coinValue = (aptosCoinResource.data as any).coin?.value;
-            if (typeof coinValue === 'number' || typeof coinValue === 'string') {
-              aptosBalance = Number(coinValue) / 10 ** 8;
+          try {
+            const aptosBalanceResult = await aptos.getAccountAPTAmount({ accountAddress: account.address });
+            console.log("APTOS balance result:", aptosBalanceResult);
+            aptosBalance = aptosBalanceResult / 10 ** 8; // Convert from octas to APT
+            console.log("APTOS balance calculated:", aptosBalance);
+          } catch (error) {
+            console.error("Failed to fetch APTOS balance with SDK, trying resource method:", error);
+            
+            // Fallback to resource method
+            const aptosCoinResource = resources.find(
+              (r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
+            );
+            console.log("APTOS coin resource:", aptosCoinResource);
+            
+            if (aptosCoinResource && aptosCoinResource.data) {
+              const coinValue = (aptosCoinResource.data as any).coin?.value;
+              console.log("APTOS coin value:", coinValue);
+              if (typeof coinValue === 'number' || typeof coinValue === 'string') {
+                aptosBalance = Number(coinValue) / 10 ** 8;
+                console.log("APTOS balance calculated (fallback):", aptosBalance);
+              }
             }
           }
 
-          // Get USDC token address from contract
+          // Get USDC balance using the contract's getBalance function
           let usdcBalance = 0;
           try {
-            const tokenResult = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getToken(aptos);
-            // getToken returns an array like ["0x69091fbab5f7d635ee7ac5098cf0c1efbe31d68fec0f2cd565e8d168daf52832"]
-            const usdcTokenAddress = tokenResult[0];
-            
-            // Ensure we have a valid address string
-            if (typeof usdcTokenAddress === 'string' && usdcTokenAddress.startsWith('0x')) {
-              // Find USDC coin store resource
-              const usdcCoinResource = resources.find(
-                (r) => r.type === `0x1::coin::CoinStore<${usdcTokenAddress}>`
-              );
-              
-              if (usdcCoinResource && usdcCoinResource.data) {
-                const coinValue = (usdcCoinResource.data as any).coin?.value;
-                if (typeof coinValue === 'number' || typeof coinValue === 'string') {
-                  usdcBalance = Number(coinValue) / 10 ** 6; // USDC has 6 decimals
-                }
-              }
-            } else {
-              console.warn("Invalid USDC token address received:", usdcTokenAddress);
-            }
+            const balanceResult = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getBalance(aptos, {
+              functionArguments: [account.address.toString()]
+            });
+            console.log("USDC balance result:", balanceResult);
+            // getBalance returns an array like [BigInt(1000000)]
+            const balanceBigInt = balanceResult[0];
+            usdcBalance = Number(balanceBigInt) / 10 ** 6; // USDC has 6 decimals
+            console.log("USDC balance calculated:", usdcBalance);
           } catch (error) {
             console.error("Failed to fetch USDC balance:", error);
           }
 
+          console.log("Final balances:", { aptos: aptosBalance, usdc: usdcBalance });
           setBalances({
             aptos: aptosBalance,
             usdc: usdcBalance,
