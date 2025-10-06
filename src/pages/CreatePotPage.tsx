@@ -50,7 +50,7 @@ export function CreatePotPage() {
     defaultDate.setHours(defaultDate.getHours() + 5);
     return defaultDate;
   });
-  const [entryFee, setEntryFee] = useState(0.01);
+  const [entryFee, setEntryFee] = useState(0.01); // Initial value, will be auto-calculated
   const [oneFaAddress, setOneFaAddress] = useState('');
   const [oneFaPrivateKey, setOneFaPrivateKey] = useState('');
   const [password, setPassword] = useState("");
@@ -113,6 +113,15 @@ export function CreatePotPage() {
     
     fetchDynamicData();
   }, []);
+
+  // Auto-calculate entry fee as 1/100th of pot value when amount changes
+  useEffect(() => {
+    if (amount > 0) {
+      const calculatedEntryFee = amount / 100;
+      setEntryFee(calculatedEntryFee);
+    }
+  }, [amount]);
+
   const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, steps.length));
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
   const getDurationInSeconds = () => {
@@ -569,7 +578,7 @@ export function CreatePotPage() {
                               step={0.01}
                             />
                           </div>
-                          <p className="text-sm text-muted-foreground">Recommended between 1/1000th and 1/100th of the pot amount.</p>
+                          <p className="text-sm text-muted-foreground">Auto-calculated as 1/100th of the pot amount. You can adjust between 1/1000th and 1/100th.</p>
                         </div>
                         <div className="space-y-2">
                           <Label>1FA Key Pair (Optional)</Label>
