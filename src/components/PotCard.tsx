@@ -12,6 +12,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
+import { validateTestnet } from "@/lib/networkValidation";
 interface PotCardProps {
   pot: Pot;
 }
@@ -19,11 +20,19 @@ export function PotCard({ pot }: PotCardProps) {
   const isHot = parseInt(pot.attempts_count) > 10;
   const expirePot = usePotStore((state) => state.expirePot);
   const [isExpiring, setIsExpiring] = useState(false);
-  const { signAndSubmitTransaction, connected, account } = useWallet();
+  const { signAndSubmitTransaction, connected, account, network } = useWallet();
   
   const handleExpirePot = async () => {
     if (!connected || !account) {
       toast.error("Please connect your wallet first");
+      return;
+    }
+    
+    // Validate network before proceeding
+    try {
+      validateTestnet(network);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Please switch to Aptos Testnet");
       return;
     }
     

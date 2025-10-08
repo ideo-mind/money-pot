@@ -1,10 +1,13 @@
 import { AptosWalletAdapterProvider } from "@aptos-labs/wallet-adapter-react";
 import { PetraWallet } from "petra-plugin-wallet-adapter";
+import { Network } from "@aptos-labs/ts-sdk";
 import { PropsWithChildren } from "react";
+
 // Wallets that are known to be stable and have correct package exports
 const wallets = [
   new PetraWallet(),
 ];
+
 export const AptosWalletProvider = ({ children }: PropsWithChildren) => {
   return (
     <AptosWalletAdapterProvider
@@ -12,6 +15,9 @@ export const AptosWalletProvider = ({ children }: PropsWithChildren) => {
       // The type definition for the provider expects `wallets`.
       wallets={wallets}
       autoConnect={true}
+      dappConfig={{
+        network: Network.TESTNET,
+      }}
       onError={(error) => {
         console.log("Wallet error", error);
       }}

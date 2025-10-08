@@ -28,6 +28,7 @@ import { SuccessAnimation } from "@/components/SuccessAnimation";
 import { usePotStore, transformToPot } from "@/store/pot-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { validateTestnet } from "@/lib/networkValidation";
 const steps = [
   { id: 1, name: "Define Pot" },
   { id: 2, name: "Set Rules" },
@@ -35,7 +36,7 @@ const steps = [
   { id: 4, name: "Review & Deposit" },
 ];
 export function CreatePotPage() {
-  const { signAndSubmitTransaction, connected, account } = useWallet();
+  const { signAndSubmitTransaction, connected, account, network } = useWallet();
   const addPot = usePotStore((state) => state.addPot);
   const fetchPots = usePotStore((state) => state.fetchPots);
   const { addTransaction, updateTransaction } = useTransactionStore();
@@ -208,6 +209,15 @@ export function CreatePotPage() {
       toast.error("Please connect your wallet first.");
       return;
     }
+    
+    // Validate network before proceeding
+    try {
+      validateTestnet(network);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Please switch to Aptos Testnet");
+      return;
+    }
+    
     if (!password || Object.keys(colorMap).length < mappableDirections.length) {
       toast.error("Please complete all fields in the previous steps.");
       return;

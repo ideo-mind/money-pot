@@ -17,12 +17,13 @@ import { Account } from "@aptos-labs/ts-sdk";
 import { getOneFaKey, storeOneFaKey } from "@/lib/oneFaStorage";
 import { useTransactionStore } from "@/store/transaction-store";
 import { AuthenticationDisplay } from "@/components/AuthenticationDisplay";
+import { validateTestnet } from "@/lib/networkValidation";
 type GameState = "idle" | "paying" | "fetching_challenge" | "playing" | "verifying" | "won" | "lost";
 type KeyState = "unchecked" | "validating" | "valid" | "invalid";
 export function PotChallengePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { connected, signAndSubmitTransaction, account } = useWallet();
+  const { connected, signAndSubmitTransaction, account, network } = useWallet();
   const pot = usePotStore((state) => state.currentPot);
   const loading = usePotStore((state) => state.loading);
   const error = usePotStore((state) => state.error);
@@ -167,6 +168,14 @@ export function PotChallengePage() {
   };
   const handleAttempt = async () => {
     if (!connected || !pot) return;
+    
+    // Validate network before proceeding
+    try {
+      validateTestnet(network);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Please switch to Aptos Testnet");
+      return;
+    }
     
     // Prevent attempts on expired pots
     if (pot.isExpired) {

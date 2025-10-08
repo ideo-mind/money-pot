@@ -8,10 +8,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LogOut, Copy, Coins } from "lucide-react";
+import { ChevronDown, LogOut, Copy, Coins, AlertTriangle, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { aptos } from "@/lib/aptos";
 import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from "@/abis";
+import { Network } from "@aptos-labs/ts-sdk";
 interface WalletBalances {
   aptos: number | null;
   usdc: number | null;
@@ -19,14 +20,25 @@ interface WalletBalances {
 }
 
 export function WalletConnectButton() {
-  const { connect, disconnect, account, wallets, connected, isLoading } = useWallet();
+  const { connect, disconnect, account, wallets, connected, isLoading, network, changeNetwork } = useWallet();
   const [balances, setBalances] = useState<WalletBalances>({
     aptos: null,
     usdc: null,
     loading: false
   });
+  const [isWrongNetwork, setIsWrongNetwork] = useState(false);
   
   const formatAddress = (address: string) => `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+  // Check if wallet is on the correct network (testnet)
+  useEffect(() => {
+    if (network) {
+      const isTestnet = network.name?.toLowerCase().includes('testnet') || 
+                       network.name?.toLowerCase().includes('test') ||
+                       network.chainId === '2'; // Aptos testnet chain ID
+      setIsWrongNetwork(!isTestnet);
+    }
+  }, [network]);
 
   // Fetch balances when connected
   useEffect(() => {
@@ -88,17 +100,46 @@ export function WalletConnectButton() {
       // You could add a toast notification here
     }
   };
+
+  const switchToTestnet = async () => {
+    if (changeNetwork) {
+      try {
+        await changeNetwork(Network.TESTNET);
+      } catch (error) {
+        console.error("Failed to switch network:", error);
+      }
+    }
+  };
   if (connected && account) {
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" className="flex items-center gap-2">
-            {/* FIX: Convert AccountAddress to string before formatting */}
-            <span>{formatAddress(account.address.toString())}</span>
-            <ChevronDown className="w-4 h-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80">
+      <div className="flex flex-col gap-2">
+        {/* Network Warning */}
+        {isWrongNetwork && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+            <span className="text-sm text-red-700 dark:text-red-300">
+              Wrong network! Please switch to Aptos Testnet
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={switchToTestnet}
+              className="ml-auto h-6 px-2 text-xs"
+            >
+              Switch
+            </Button>
+          </div>
+        )}
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="flex items-center gap-2">
+              {/* FIX: Convert AccountAddress to string before formatting */}
+              <span>{formatAddress(account.address.toString())}</span>
+              <ChevronDown className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-80">
           {/* Address Section */}
           <DropdownMenuLabel className="px-3 py-2">
             <div className="space-y-2">
@@ -115,6 +156,24 @@ export function WalletConnectButton() {
                 >
                   <Copy className="w-3 h-3" />
                 </Button>
+              </div>
+            </div>
+          </DropdownMenuLabel>
+          
+          <DropdownMenuSeparator />
+          
+          {/* Network Section */}
+          <DropdownMenuLabel className="px-3 py-2">
+            <div className="space-y-2">
+              <div className="text-xs text-muted-foreground">Network</div>
+              <div className="flex items-center gap-2">
+                <Wifi className={`w-3 h-3 ${isWrongNetwork ? 'text-red-500' : 'text-green-500'}`} />
+                <span className={`text-xs ${isWrongNetwork ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                  {network?.name || 'Unknown Network'}
+                </span>
+                {isWrongNetwork && (
+                  <span className="text-xs text-red-500">(Wrong Network)</span>
+                )}
               </div>
             </div>
           </DropdownMenuLabel>
@@ -151,6 +210,7 @@ export function WalletConnectButton() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
     );
   }
   return (
