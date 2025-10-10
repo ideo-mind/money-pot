@@ -20,7 +20,6 @@ export const ENV_CONFIG = {
   APTOS_NODE_URL,
   MONEY_POT_CONTRACT_ADDRESS,
   MONEY_AUTH_URL: import.meta.env.MONEY_AUTH_URL || "https://auth.money-pot.unreal.art",
-  VERIFIER_SERVICE_BASE_URL: import.meta.env.VITE_VERIFIER_SERVICE_BASE_URL || "",
   USDC_TOKEN_ADDRESS: import.meta.env.VITE_USDC_TOKEN_ADDRESS || "0xf22bede237a07e121b56d91a491eb7bcdfd1f5907926a9e58338f964a01b17da",
   NODE_ENV: import.meta.env.MODE || "development"
 };
