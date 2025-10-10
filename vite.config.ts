@@ -25,6 +25,7 @@ export default defineConfig(({ mode }) => {
       // Expose environment variables for the client
       'import.meta.env.APTOS_NODE_URL': JSON.stringify(env.APTOS_NODE_URL || 'https://fullnode.testnet.aptoslabs.com/v1'),
       'import.meta.env.MONEY_AUTH_URL': JSON.stringify(env.MONEY_AUTH_URL || 'https://auth.money-pot.unreal.art'),
+      'import.meta.env.WALLETCONNECT_PROJECT_ID': JSON.stringify(env.WALLETCONNECT_PROJECT_ID || ''),
     },
     server: {
       port: parseInt(env.PORT || '3000'),

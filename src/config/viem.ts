@@ -1,4 +1,7 @@
-import moneyPotABI  from '@/abis/evm/MoneyPot.json';
+import moneyPotABI from '@/abis/evm/MoneyPot.json';
+
+// Export the ABI
+export { moneyPotABI };
 import { createPublicClient, createWalletClient, http, webSocket, defineChain } from 'viem';
 
 // Creditcoin EVM Testnet Configuration - Hardcoded values
@@ -42,11 +45,12 @@ export const creditcoinTestnet = defineChain({
   testnet: true,
 });
 
-// Contract Configuration - Hardcoded
-export const MONEY_POT_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000' as `0x${string}`;
+// Contract Configuration - From chain config
+export const MONEY_POT_CONTRACT_ADDRESS = creditcoinTestnet.custom.moneypot.address as `0x${string}`;
+export const USDC_TOKEN_ADDRESS = creditcoinTestnet.custom.token.address as `0x${string}`;
 
 // WalletConnect Configuration - Hardcoded
-export const WALLETCONNECT_PROJECT_ID = 'your-walletconnect-project-id'; // Replace with your actual project ID
+export const WALLETCONNECT_PROJECT_ID = import.meta.env.WALLETCONNECT_PROJECT_ID;
 
 // Create public client for read operations
 export const publicClient = createPublicClient({
@@ -90,10 +94,16 @@ export const EVM_CONFIG = {
   CHAIN_NAME: 'Creditcoin Testnet',
   EXPLORER_URL: 'https://creditcoin-testnet.blockscout.com',
   CONTRACT_ADDRESS: MONEY_POT_CONTRACT_ADDRESS,
+  USDC_TOKEN_ADDRESS,
   WALLETCONNECT_PROJECT_ID,
   NATIVE_CURRENCY: {
     name: 'Creditcoin',
     symbol: 'CTC',
     decimals: 18,
+  },
+  USDC_TOKEN: {
+    name: 'Money Pot',
+    symbol: 'USDC',
+    decimals: 6,
   },
 };

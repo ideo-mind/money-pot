@@ -54,13 +54,13 @@ The application now supports both Aptos and EVM (Creditcoin) networks, allowing 
 
 ## Configuration
 
-All EVM configuration is hardcoded in `src/config/viem.ts`. No environment variables needed for EVM setup.
+All EVM configuration is centralized in `src/config/viem.ts`. Contract addresses are defined in the chain configuration.
 
 **To update configuration:**
 
 1. Edit `src/config/viem.ts`
-2. Update `WALLETCONNECT_PROJECT_ID` with your actual project ID
-3. Update `MONEY_POT_CONTRACT_ADDRESS` with your deployed contract address
+2. Update contract addresses in `creditcoinTestnet.custom.moneypot.address` and `creditcoinTestnet.custom.token.address`
+3. Set `VITE_WALLETCONNECT_PROJECT_ID` in your environment
 
 ## Usage
 
@@ -107,8 +107,8 @@ const potData = await evmContractService.getPot(potId)
 When you provide the actual contract ABI, update the following files:
 
 1. **`src/config/viem.ts`**
-   - Update `WALLETCONNECT_PROJECT_ID` with your actual project ID
-   - Update `MONEY_POT_CONTRACT_ADDRESS` with your deployed contract address
+   - Update contract addresses in `creditcoinTestnet.custom.moneypot.address` and `creditcoinTestnet.custom.token.address`
+   - Set `VITE_WALLETCONNECT_PROJECT_ID` in your environment
 
 2. **`src/abis/evm/money-pot.ts`**
    - Replace placeholder ABI with actual contract ABI
@@ -139,8 +139,8 @@ The integration includes comprehensive error handling for:
 
 To test the EVM integration:
 
-1. Update WalletConnect Project ID in `src/config/viem.ts`
-2. Update contract address in `src/config/viem.ts`
+1. Set `VITE_WALLETCONNECT_PROJECT_ID` in your environment
+2. Update contract addresses in `src/config/viem.ts`
 3. Deploy the contract to Creditcoin testnet
 4. Connect an EVM wallet (MetaMask recommended)
 5. Test contract interactions
