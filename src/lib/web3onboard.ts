@@ -19,7 +19,7 @@ const walletConnect = walletConnectModule({
 const coinbase = coinbaseModule();
 
 // Initialize MetaMask module
-const metamask = metamaskModule();
+const metamask = metamaskModule({ options: {} });
 
 // Create the onboard instance
 export const onboard = Onboard({
