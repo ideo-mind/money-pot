@@ -1,3 +1,4 @@
+import moneyPotABI  from '@/abis/evm/MoneyPot.json';
 import { createPublicClient, createWalletClient, http, webSocket, defineChain } from 'viem';
 
 // Creditcoin EVM Testnet Configuration - Hardcoded values
@@ -24,6 +25,19 @@ export const creditcoinTestnet = defineChain({
       name: 'Creditcoin Explorer',
       url: 'https://creditcoin-testnet.blockscout.com',
     },
+  },
+  custom: {
+    token: {
+      address: "0x44ed237C983c1CbB05d72885AE17ec9EC0B5A32C",
+      symbol: "USDC",
+      name: "Money Pot",
+      decimals: 6,
+      abis: moneyPotABI.abi,
+    },
+    moneypot: {
+      address: "0x44ed237C983c1CbB05d72885AE17ec9EC0B5A32C",
+      abis: moneyPotABI.abi,
+    }
   },
   testnet: true,
 });
