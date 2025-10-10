@@ -10,7 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouteErrorBoundary } from './components/RouteErrorBoundary';
 import './index.css'
 import { HomePage } from './pages/HomePage'
-import { AptosWalletProvider } from "./components/AptosWalletProvider";
+import { UnifiedWalletProvider } from "./components/UnifiedWalletProvider";
 import { Layout } from "./components/Layout";
 import { CreatePotPage } from "./pages/CreatePotPage";
 import { PotsListPage } from "./pages/PotsListPage";
@@ -36,9 +36,9 @@ const router = createBrowserRouter([
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <AptosWalletProvider>
+      <UnifiedWalletProvider>
         <RouterProvider router={router} />
-      </AptosWalletProvider>
+      </UnifiedWalletProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

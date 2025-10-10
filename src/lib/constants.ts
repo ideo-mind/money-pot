@@ -6,6 +6,25 @@ export const COLORS = [
 ];
 export const ALL_DIRECTIONS = ["Up", "Down", "Left", "Right", "Skip"];
 export const MAPPABLE_DIRECTIONS = ["Up", "Down", "Left", "Right"];
+
+// Network configurations
+export const NETWORKS = {
+  APTOS: {
+    name: 'Aptos Testnet',
+    chainId: '2',
+    symbol: 'APT',
+    type: 'aptos' as const,
+  },
+  CREDITCOIN: {
+    name: 'Creditcoin Testnet',
+    chainId: '102031',
+    symbol: 'CTC',
+    type: 'evm' as const,
+  },
+};
+
+// Wallet types
+export type WalletType = 'aptos' | 'evm';
 const uniqueChars = (arr: string[]) => [...new Set(arr)];
 export const CHARACTER_DOMAINS: Record<string, string[]> = {
   ascii: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split(""),
