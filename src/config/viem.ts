@@ -29,18 +29,19 @@ export const creditcoinTestnet = defineChain({
       url: 'https://creditcoin-testnet.blockscout.com',
     },
   },
-  custom: {
-    token: {
-      address: "0x44ed237C983c1CbB05d72885AE17ec9EC0B5A32C",
+ custom: {
+    moneypot: {
+      address: "0xEC020aA4De9567Ae9dF9f43Da71414aE4932F6f3",
+      abis: moneyPotABI,
+      token: {
+      address: "0xEC020aA4De9567Ae9dF9f43Da71414aE4932F6f3",
       symbol: "USDC",
       name: "Money Pot",
       decimals: 6,
       abis: moneyPotABI,
     },
-    moneypot: {
-      address: "0x44ed237C983c1CbB05d72885AE17ec9EC0B5A32C",
-      abis: moneyPotABI,
     }
+
   },
   testnet: true,
 });
