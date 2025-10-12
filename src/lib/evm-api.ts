@@ -1,5 +1,13 @@
 import { publicClient, createEVMWalletClient, parseCTC, formatCTC } from '@/config/viem';
-import { contractFunctions, formatPotData, stringToBytes32, PotData, CreatePotParams, AttemptPotParams } from '@/abis/evm/money-pot';
+import { 
+  contractFunctions, 
+  formatPotData, 
+  formatAttemptData,
+  MoneyPotData, 
+  AttemptData,
+  CreatePotParams, 
+  AttemptPotParams 
+} from '@/abis/evm/money-pot';
 import { Address } from 'viem';
 
 export interface EVMPot {
@@ -51,16 +59,16 @@ class EVMContractService {
     try {
       const hash = await this.walletClient.writeContract({
         ...contractFunctions.createPot,
-        args: [params.entryFee, params.duration],
+        args: [params.amount, params.durationSeconds, params.fee, params.oneFaAddress],
       });
 
       // Wait for transaction confirmation
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       
       if (receipt.status === 'success') {
-        // Extract pot ID from logs (assuming PotCreated event)
+        // Extract pot ID from PotCreated event
         const potCreatedLog = receipt.logs.find(log => 
-          log.topics[0] === '0x...' // Replace with actual event signature
+          log.topics[0] === '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925' // PotCreated event signature
         );
         
         if (potCreatedLog) {
@@ -76,31 +84,30 @@ class EVMContractService {
     }
   }
 
-  // Attempt to solve a pot
-  async attemptPot(params: AttemptPotParams): Promise<boolean> {
+  // Attempt to solve a pot (returns attempt ID)
+  async attemptPot(params: AttemptPotParams): Promise<string> {
     if (!this.walletClient) {
       throw new Error('Wallet not connected');
     }
 
     try {
-      const passwordBytes32 = stringToBytes32(params.password);
-      
       const hash = await this.walletClient.writeContract({
         ...contractFunctions.attemptPot,
-        args: [params.potId, passwordBytes32],
+        args: [params.potId],
       });
 
       // Wait for transaction confirmation
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       
       if (receipt.status === 'success') {
-        // Extract success result from logs (assuming PotAttempted event)
+        // Extract attempt ID from PotAttempted event
         const attemptLog = receipt.logs.find(log => 
-          log.topics[0] === '0x...' // Replace with actual event signature
+          log.topics[0] === '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925' // PotAttempted event signature
         );
         
         if (attemptLog) {
-          return attemptLog.data === '0x0000000000000000000000000000000000000000000000000000000000000001';
+          const attemptId = BigInt(attemptLog.topics[1]);
+          return attemptId.toString();
         }
       }
 
@@ -111,22 +118,22 @@ class EVMContractService {
     }
   }
 
-  // Get pot data
-  async getPot(potId: string): Promise<PotData | null> {
+  // Get pot data by ID
+  async getPot(potId: string): Promise<MoneyPotData | null> {
     try {
       const result = await publicClient.readContract({
         ...contractFunctions.getPot,
         args: [BigInt(potId)],
       });
 
-      return formatPotData(result);
+      return formatPotData(result as MoneyPotData);
     } catch (error) {
       console.error('Failed to get pot:', error);
       return null;
     }
   }
 
-  // Get user balance
+  // Get user's USDC balance
   async getBalance(address: Address): Promise<number> {
     try {
       const result = await publicClient.readContract({
@@ -134,25 +141,73 @@ class EVMContractService {
         args: [address],
       });
 
-      return Number(result) / 10 ** 6; // Assuming USDC has 6 decimals
+      return Number(result) / 10 ** 6; // USDC has 6 decimals
     } catch (error) {
       console.error('Failed to get balance:', error);
       return 0;
     }
   }
 
-  // Get attempts count for a pot
-  async getAttemptsCount(potId: string): Promise<number> {
+  // Get all active pot IDs
+  async getActivePots(): Promise<string[]> {
     try {
       const result = await publicClient.readContract({
-        ...contractFunctions.getAttemptsCount,
-        args: [BigInt(potId)],
+        ...contractFunctions.getActivePots,
       });
 
-      return Number(result);
+      return (result as bigint[]).map(id => id.toString());
     } catch (error) {
-      console.error('Failed to get attempts count:', error);
-      return 0;
+      console.error('Failed to get active pots:', error);
+      return [];
+    }
+  }
+
+  // Get all pot IDs
+  async getPots(): Promise<string[]> {
+    try {
+      const result = await publicClient.readContract({
+        ...contractFunctions.getPots,
+      });
+
+      return (result as bigint[]).map(id => id.toString());
+    } catch (error) {
+      console.error('Failed to get pots:', error);
+      return [];
+    }
+  }
+
+  // Get attempt data by ID
+  async getAttempt(attemptId: string): Promise<AttemptData | null> {
+    try {
+      const result = await publicClient.readContract({
+        ...contractFunctions.getAttempt,
+        args: [BigInt(attemptId)],
+      });
+
+      return formatAttemptData(result as AttemptData);
+    } catch (error) {
+      console.error('Failed to get attempt:', error);
+      return null;
+    }
+  }
+
+  // Mark attempt as completed (oracle function)
+  async attemptCompleted(attemptId: string, status: boolean): Promise<void> {
+    if (!this.walletClient) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      const hash = await this.walletClient.writeContract({
+        ...contractFunctions.attemptCompleted,
+        args: [BigInt(attemptId), status],
+      });
+
+      // Wait for transaction confirmation
+      await publicClient.waitForTransactionReceipt({ hash });
+    } catch (error) {
+      console.error('Failed to mark attempt completed:', error);
+      throw error;
     }
   }
 
@@ -176,52 +231,36 @@ class EVMContractService {
     }
   }
 
-  // Withdraw funds
-  async withdraw(amount: number): Promise<void> {
-    if (!this.walletClient) {
-      throw new Error('Wallet not connected');
-    }
-
+  // Get next pot ID
+  async getNextPotId(): Promise<number> {
     try {
-      const amountWei = BigInt(Math.floor(amount * 10 ** 6)); // Assuming USDC has 6 decimals
-      
-      const hash = await this.walletClient.writeContract({
-        ...contractFunctions.withdraw,
-        args: [amountWei],
+      const result = await publicClient.readContract({
+        ...contractFunctions.nextPotId,
       });
 
-      // Wait for transaction confirmation
-      await publicClient.waitForTransactionReceipt({ hash });
+      return Number(result);
     } catch (error) {
-      console.error('Failed to withdraw:', error);
-      throw error;
+      console.error('Failed to get next pot ID:', error);
+      return 0;
     }
   }
 
-  // Deposit funds
-  async deposit(amount: number): Promise<void> {
-    if (!this.walletClient) {
-      throw new Error('Wallet not connected');
-    }
-
+  // Get next attempt ID
+  async getNextAttemptId(): Promise<number> {
     try {
-      const amountWei = BigInt(Math.floor(amount * 10 ** 6)); // Assuming USDC has 6 decimals
-      
-      const hash = await this.walletClient.writeContract({
-        ...contractFunctions.deposit,
-        args: [amountWei],
+      const result = await publicClient.readContract({
+        ...contractFunctions.nextAttemptId,
       });
 
-      // Wait for transaction confirmation
-      await publicClient.waitForTransactionReceipt({ hash });
+      return Number(result);
     } catch (error) {
-      console.error('Failed to deposit:', error);
-      throw error;
+      console.error('Failed to get next attempt ID:', error);
+      return 0;
     }
   }
 
   // Transform pot data for UI
-  transformPotData(potData: PotData, potId: string): EVMPot {
+  transformPotData(potData: MoneyPotData): EVMPot {
     const now = new Date();
     const expiresAt = new Date(Number(potData.expiresAt) * 1000);
     const isExpired = now > expiresAt;
@@ -229,25 +268,29 @@ class EVMContractService {
     const timeLeft = isExpired ? 'Expired' : this.calculateTimeLeft(expiresAt);
     
     return {
-      id: potId,
+      id: potData.id.toString(),
       creator: potData.creator,
-      total_usdc: potData.totalUsdc.toString(),
-      entry_fee: potData.entryFee.toString(),
+      total_usdc: potData.totalAmount.toString(),
+      entry_fee: potData.fee.toString(),
       created_at: potData.createdAt.toString(),
       expires_at: expiresAt,
       is_active: potData.isActive,
       attempts_count: potData.attemptsCount.toString(),
       one_fa_address: potData.oneFaAddress,
-      title: `Pot #${potId}`,
-      totalValue: Number(potData.totalUsdc) / 10 ** 6,
-      entryFee: Number(potData.entryFee) / 10 ** 6,
-      potentialReward: Number(potData.totalUsdc) / 10 ** 6,
+      title: `Pot #${potData.id}`,
+      totalValue: Number(potData.totalAmount) / 10 ** 6,
+      entryFee: Number(potData.fee) / 10 ** 6,
+      potentialReward: Number(potData.totalAmount) / 10 ** 6,
       timeLeft,
       isExpired,
       creatorAvatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${potData.creator}`,
-      creatorUsername: formatAddress(potData.creator),
+      creatorUsername: this.formatAddress(potData.creator),
       difficulty: Math.min(Number(potData.attemptsCount) + 1, 10),
     };
+  }
+
+  private formatAddress(address: string): string {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }
 
   private calculateTimeLeft(expiresAt: Date): string {

@@ -16,6 +16,7 @@ import { Network } from "@aptos-labs/ts-sdk";
 import { useUnifiedWallet } from "./UnifiedWalletProvider";
 import { publicClient, formatEVMAddress, formatCTC } from "@/config/viem";
 import { getConnectedWallet } from "@/lib/web3onboard";
+import { evmContractService } from "@/lib/evm-api";
 
 interface WalletBalances {
   aptos: number | null;
@@ -97,9 +98,17 @@ export function UnifiedWalletConnectButton() {
               console.error("Failed to fetch CTC balance:", error);
             }
 
+            // Get USDC balance from contract
+            let usdcBalance = 0;
+            try {
+              usdcBalance = await evmContractService.getBalance(walletState.address as `0x${string}`);
+            } catch (error) {
+              console.error("Failed to fetch USDC balance:", error);
+            }
+
             setBalances({
               aptos: null,
-              usdc: null,
+              usdc: usdcBalance,
               ctc: ctcBalance,
               loading: false
             });
@@ -254,10 +263,16 @@ export function UnifiedWalletConnectButton() {
                     </>
                   )}
                   {walletState.type === 'evm' && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <Coins className="w-3 h-3 text-purple-500" />
-                      <span>CTC: {typeof balances.ctc === 'number' ? balances.ctc.toFixed(4) : '0.0000'}</span>
-                    </div>
+                    <>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Coins className="w-3 h-3 text-purple-500" />
+                        <span>CTC: {typeof balances.ctc === 'number' ? balances.ctc.toFixed(4) : '0.0000'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Coins className="w-3 h-3 text-blue-500" />
+                        <span>USDC: {typeof balances.usdc === 'number' ? balances.usdc.toFixed(2) : '0.00'}</span>
+                      </div>
+                    </>
                   )}
                 </div>
               )}

@@ -1,7 +1,7 @@
-import moneyPotABI from '@/abis/evm/MoneyPot.json';
+import moneyPotABIJson from '@/abis/evm/MoneyPot.json';
 
-// Export the ABI
-export { moneyPotABI };
+// Export the ABI as an array (viem expects an array, not an object)
+export const moneyPotABI = moneyPotABIJson.abi;
 import { createPublicClient, createWalletClient, http, webSocket, defineChain } from 'viem';
 
 // Creditcoin EVM Testnet Configuration - Hardcoded values
@@ -35,11 +35,11 @@ export const creditcoinTestnet = defineChain({
       symbol: "USDC",
       name: "Money Pot",
       decimals: 6,
-      abis: moneyPotABI.abi,
+      abis: moneyPotABI,
     },
     moneypot: {
       address: "0x44ed237C983c1CbB05d72885AE17ec9EC0B5A32C",
-      abis: moneyPotABI.abi,
+      abis: moneyPotABI,
     }
   },
   testnet: true,

@@ -88,36 +88,46 @@ import { evmContractService } from "@/lib/evm-api"
 
 // Create a pot
 const potId = await evmContractService.createPot({
-  entryFee: parseCTC(10), // 10 CTC
-  duration: BigInt(86400), // 24 hours
+  amount: BigInt(100 * 10 ** 6), // 100 USDC (6 decimals)
+  durationSeconds: BigInt(86400), // 24 hours
+  fee: BigInt(10 * 10 ** 6), // 10 USDC entry fee
+  oneFaAddress: "0x...", // 1Password address
 })
 
-// Attempt a pot
-const success = await evmContractService.attemptPot({
+// Attempt a pot (returns attempt ID)
+const attemptId = await evmContractService.attemptPot({
   potId: BigInt(potId),
-  password: "user_password",
 })
 
 // Get pot data
 const potData = await evmContractService.getPot(potId)
+
+// Get user's USDC balance
+const balance = await evmContractService.getBalance(userAddress)
+
+// Get all active pots
+const activePots = await evmContractService.getActivePots()
 ```
 
-## Contract ABI Integration
+## Contract Integration Status
 
-When you provide the actual contract ABI, update the following files:
+✅ **Fully Integrated Functions:**
 
-1. **`src/config/viem.ts`**
-   - Update contract addresses in `creditcoinTestnet.custom.moneypot.address` and `creditcoinTestnet.custom.token.address`
-   - Set `VITE_WALLETCONNECT_PROJECT_ID` in your environment
+- `getBalance(address)` - Get user's USDC balance
+- `createPot(amount, durationSeconds, fee, oneFaAddress)` - Create new pot
+- `attemptPot(potId)` - Attempt to solve pot (returns attempt ID)
+- `getPot(potId)` - Get pot data by ID
+- `getActivePots()` - Get all active pot IDs
+- `getPots()` - Get all pot IDs
+- `getAttempt(attemptId)` - Get attempt data
+- `attemptCompleted(attemptId, status)` - Mark attempt as completed (oracle)
+- `expirePot(potId)` - Expire a pot
+- `nextPotId()` - Get next pot ID
+- `nextAttemptId()` - Get next attempt ID
 
-2. **`src/abis/evm/money-pot.ts`**
-   - Replace placeholder ABI with actual contract ABI
-   - Adjust function signatures and return types
-
-3. **`src/lib/evm-api.ts`**
-   - Update function implementations to match actual contract
-   - Adjust event parsing logic
-   - Update data transformation functions
+✅ **Contract ABI:** Using actual MoneyPot.json ABI
+✅ **Event Handling:** PotCreated, PotAttempted, PotSolved, PotFailed events
+✅ **Type Safety:** Full TypeScript support with proper interfaces
 
 ## Network Switching
 
