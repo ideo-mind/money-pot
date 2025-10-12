@@ -16,7 +16,8 @@ import { CreatePotPage } from "./pages/CreatePotPage";
 import { PotsListPage } from "./pages/PotsListPage";
 import { PotChallengePage } from "./pages/PotChallengePage";
 import { DashboardPage } from "./pages/DashboardPage";
-import { LeaderboardPage } from "./pages/LeaderboardPage"; // Import the new page
+import { LeaderboardPage } from "./pages/LeaderboardPage";
+import { FaucetPage } from "./pages/FaucetPage";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -28,7 +29,8 @@ const router = createBrowserRouter([
       { path: "pots", element: <PotsListPage /> },
       { path: "pots/:id", element: <PotChallengePage /> },
       { path: "dashboard", element: <DashboardPage /> },
-      { path: "leaderboard", element: <LeaderboardPage /> }, // Add the new route
+      { path: "leaderboard", element: <LeaderboardPage /> },
+      { path: "faucet", element: <FaucetPage /> },
     ]
   },
 ]);

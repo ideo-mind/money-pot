@@ -26,9 +26,13 @@ import { ColorDirectionMapper } from "@/components/ColorDirectionMapper";
 import { CharacterSelector } from "@/components/CharacterSelector";
 import { SuccessAnimation } from "@/components/SuccessAnimation";
 import { usePotStore, transformToPot } from "@/store/pot-store";
+import { useEVMPotStore, transformEVMPotToPot } from "@/store/evm-pot-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { validateTestnet } from "@/lib/networkValidation";
+import { useUnifiedWallet } from "@/components/UnifiedWalletProvider";
+import { useNetworkAdapter } from "@/lib/network-adapter";
+import { evmVerifierService, EVMVerifierServiceClient } from "@/lib/evm-verifier-api";
 const steps = [
   { id: 1, name: "Define Pot" },
   { id: 2, name: "Set Rules" },
@@ -37,8 +41,12 @@ const steps = [
 ];
 export function CreatePotPage() {
   const { signAndSubmitTransaction, connected, account, network } = useWallet();
+  const { walletState } = useUnifiedWallet();
+  const { adapter } = useNetworkAdapter();
   const addPot = usePotStore((state) => state.addPot);
+  const addEVMPot = useEVMPotStore((state) => state.addPot);
   const fetchPots = usePotStore((state) => state.fetchPots);
+  const fetchEVMPots = useEVMPotStore((state) => state.fetchPots);
   const { addTransaction, updateTransaction } = useTransactionStore();
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
@@ -205,17 +213,19 @@ export function CreatePotPage() {
     toast.info("Color mapping has been randomized!");
   };
   const handleCreatePot = async () => {
-    if (!connected || !account) {
+    if (!walletState?.type || !walletState?.address) {
       toast.error("Please connect your wallet first.");
       return;
     }
     
-    // Validate network before proceeding
-    try {
-      validateTestnet(network);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Please switch to Aptos Testnet");
-      return;
+    // Validate network based on wallet type
+    if (walletState.type === 'aptos') {
+      try {
+        validateTestnet(network);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Please switch to Aptos Testnet");
+        return;
+      }
     }
     
     if (!password || Object.keys(colorMap).length < mappableDirections.length) {
@@ -226,11 +236,17 @@ export function CreatePotPage() {
     // Generate a default 1FA address if none was provided
     let finalOneFaAddress = oneFaAddress;
     if (!finalOneFaAddress) {
-      const defaultAccount = Account.generate();
-      finalOneFaAddress = defaultAccount.accountAddress.toString();
+      if (walletState.type === 'aptos') {
+        const defaultAccount = Account.generate();
+        finalOneFaAddress = defaultAccount.accountAddress.toString();
+      } else {
+        // For EVM, generate a random address
+        finalOneFaAddress = `0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+      }
     }
+    
     setIsSubmitting(true);
-    const toastId = toast.loading("Submitting transaction to Aptos...");
+    const toastId = toast.loading(`Submitting transaction to ${walletState.type === 'evm' ? 'Creditcoin' : 'Aptos'}...`);
     
     // Add transaction to log
     const txId = addTransaction({
@@ -242,111 +258,11 @@ export function CreatePotPage() {
     });
     
     try {
-      const amountInOctas = BigInt(Math.floor(amount * 1_000_000));
-      const entryFeeInOctas = BigInt(Math.floor(entryFee * 1_000_000));
-      const durationInSeconds = BigInt(getDurationInSeconds());
-      
-      // Use wallet adapter to sign and submit transaction
-      const response = await signAndSubmitTransaction({
-        sender: account.address,
-        data: {
-          function: `${MODULE_ADDRESS}::${MODULE_NAME}::create_pot_entry`,
-          typeArguments: [],
-          functionArguments: [
-            amountInOctas.toString(),
-            durationInSeconds.toString(),
-            entryFeeInOctas.toString(),
-            finalOneFaAddress,
-          ],
-        },
-      });
-      
-      // Update transaction with hash
-      updateTransaction(txId, { hash: response.hash });
-      
-      // Wait for transaction to complete
-      const result = await aptos.waitForTransaction({
-        transactionHash: response.hash,
-      });
-      
-      // Debug: Log all events to understand the structure
-      console.log("Transaction result:", result);
-      console.log("All events:", (result as any).events);
-      
-      let potId: string | undefined;
-      
-      // Extract pot_id from events using proper PotEvent type
-      const potCreatedEvent = (result as any).events?.find((e: any) => {
-        console.log("Checking event:", e);
-        // Look for PotEvent with event_type containing "created"
-        if (e.type.includes("PotEvent")) {
-          const eventData = e.data as money_pot_manager.PotEvent;
-          console.log("PotEvent data:", eventData);
-          return eventData.event_type.includes("created");
-        }
-        return false;
-      });
-      
-      if (potCreatedEvent) {
-        const eventData = potCreatedEvent.data as money_pot_manager.PotEvent;
-        potId = eventData.id.toString();
-        console.log("Extracted pot_id from PotEvent:", potId);
+      if (walletState.type === 'evm') {
+        await handleEVMCreatePot(finalOneFaAddress, toastId, txId);
       } else {
-        // Fallback: try to find any event that might contain pot information
-        console.log("No PotEvent found, trying fallback...");
-        const fallbackEvent = (result as any).events?.find((e: any) => 
-          e.type.includes("money_pot") || e.type.includes("created") || e.type.includes("pot")
-        );
-        
-        if (fallbackEvent) {
-          console.log("Found fallback event:", fallbackEvent);
-          // Try to extract pot_id from various possible locations
-          potId = fallbackEvent.data?.pot_id?.toString() || fallbackEvent.data?.id?.toString() || fallbackEvent.data?.value?.toString();
-          if (potId) {
-            console.log("Extracted pot_id from fallback:", potId);
-          } else {
-            throw new Error(`Could not extract pot_id from fallback event: ${JSON.stringify(fallbackEvent)}`);
-          }
-        } else {
-          throw new Error(`Could not find any relevant event in transaction result. Available events: ${JSON.stringify((result as any).events)}`);
-        }
+        await handleAptosCreatePot(finalOneFaAddress, toastId, txId);
       }
-      
-      if (!potId) {
-        throw new Error("Could not extract pot_id from any event.");
-      }
-      
-      toast.loading("Registering pot with verifier...", { id: toastId });
-      
-      // Register with verifier service
-      await registerPot({ 
-        potId: potId.toString(), 
-        password, 
-        legend: colorMap, 
-        oneFaAddress: finalOneFaAddress 
-      });
-      
-      // Fetch the created pot from blockchain
-      const [potData] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
-        functionArguments: [BigInt(potId)]
-      });
-      
-      const newPot = transformToPot(potData);
-      addPot(newPot);
-      
-      // Refresh the pots list to get the latest pot IDs and ensure new pot appears at top
-      await fetchPots(true);
-      
-      // Update transaction as successful
-      updateTransaction(txId, { 
-        status: 'success', 
-        potId: potId.toString(),
-        description: `Successfully created Pot #${potId} with ${amount} USDC`
-      });
-      
-      toast.dismiss(toastId);
-      setCreationSuccess(true);
-      setTimeout(() => navigate("/pots"), 3000);
     } catch (error) {
       console.error("Pot creation failed:", error);
       
@@ -359,6 +275,194 @@ export function CreatePotPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEVMCreatePot = async (finalOneFaAddress: string, toastId: string, txId: string) => {
+    // Create pot using network adapter
+    const result = await adapter.createPot({
+      amount,
+      duration: getDurationInSeconds(),
+      fee: entryFee,
+      password,
+      colorMap,
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create EVM pot');
+    }
+
+    const potId = result.data;
+    
+    // Update transaction with hash (we'll need to get this from the contract service)
+    updateTransaction(txId, { hash: potId }); // Using potId as hash for now
+    
+    toast.loading("Registering pot with verifier...", { id: toastId });
+    
+    // Register with EVM verifier service
+    const timestamp = Math.floor(Date.now() / 1000);
+    const payload = {
+      pot_id: potId,
+      "1p": password,
+      legend: colorMap,
+      iat: timestamp,
+      iss: walletState!.address!,
+      exp: timestamp + 3600, // 1 hour
+    };
+
+    // Get encryption key
+    const { public_key } = await evmVerifierService.registerOptions();
+    
+    // Encrypt payload
+    const encryptedPayload = EVMVerifierServiceClient.encryptPayload(payload);
+    
+    // Create signature using the connected wallet
+    const message = JSON.stringify(payload);
+    const signature = await EVMVerifierServiceClient.createEVMSignature(
+      { signMessage: async ({ message }: { message: string }) => {
+        // This would need to be connected to the actual EVM wallet
+        // For now, we'll use a placeholder
+        throw new Error('EVM wallet signature not yet implemented');
+      }},
+      message
+    );
+
+    // Register with verifier
+    await evmVerifierService.registerVerify(
+      encryptedPayload,
+      public_key,
+      signature
+    );
+    
+    // Fetch the created pot from blockchain
+    const potData = await adapter.getPot(potId);
+    if (!potData.success || !potData.data) {
+      throw new Error('Failed to fetch created pot');
+    }
+    
+    const newPot = transformEVMPotToPot(potData.data);
+    addEVMPot(newPot);
+    
+    // Refresh the pots list
+    await fetchEVMPots(true);
+    
+    // Update transaction as successful
+    updateTransaction(txId, { 
+      status: 'success', 
+      potId: potId,
+      description: `Successfully created Pot #${potId} with ${amount} USDC`
+    });
+    
+    toast.dismiss(toastId);
+    setCreationSuccess(true);
+    setTimeout(() => navigate("/pots"), 3000);
+  };
+
+  const handleAptosCreatePot = async (finalOneFaAddress: string, toastId: string, txId: string) => {
+    const amountInOctas = BigInt(Math.floor(amount * 1_000_000));
+    const entryFeeInOctas = BigInt(Math.floor(entryFee * 1_000_000));
+    const durationInSeconds = BigInt(getDurationInSeconds());
+    
+    // Use wallet adapter to sign and submit transaction
+    const response = await signAndSubmitTransaction({
+      sender: account!.address,
+      data: {
+        function: `${MODULE_ADDRESS}::${MODULE_NAME}::create_pot_entry`,
+        typeArguments: [],
+        functionArguments: [
+          amountInOctas.toString(),
+          durationInSeconds.toString(),
+          entryFeeInOctas.toString(),
+          finalOneFaAddress,
+        ],
+      },
+    });
+    
+    // Update transaction with hash
+    updateTransaction(txId, { hash: response.hash });
+    
+    // Wait for transaction to complete
+    const result = await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    });
+    
+    // Debug: Log all events to understand the structure
+    console.log("Transaction result:", result);
+    console.log("All events:", (result as any).events);
+    
+    let potId: string | undefined;
+    
+    // Extract pot_id from events using proper PotEvent type
+    const potCreatedEvent = (result as any).events?.find((e: any) => {
+      console.log("Checking event:", e);
+      // Look for PotEvent with event_type containing "created"
+      if (e.type.includes("PotEvent")) {
+        const eventData = e.data as money_pot_manager.PotEvent;
+        console.log("PotEvent data:", eventData);
+        return eventData.event_type.includes("created");
+      }
+      return false;
+    });
+    
+    if (potCreatedEvent) {
+      const eventData = potCreatedEvent.data as money_pot_manager.PotEvent;
+      potId = eventData.id.toString();
+      console.log("Extracted pot_id from PotEvent:", potId);
+    } else {
+      // Fallback: try to find any event that might contain pot information
+      console.log("No PotEvent found, trying fallback...");
+      const fallbackEvent = (result as any).events?.find((e: any) => 
+        e.type.includes("money_pot") || e.type.includes("created") || e.type.includes("pot")
+      );
+      
+      if (fallbackEvent) {
+        console.log("Found fallback event:", fallbackEvent);
+        // Try to extract pot_id from various possible locations
+        potId = fallbackEvent.data?.pot_id?.toString() || fallbackEvent.data?.id?.toString() || fallbackEvent.data?.value?.toString();
+        if (potId) {
+          console.log("Extracted pot_id from fallback:", potId);
+        } else {
+          throw new Error(`Could not extract pot_id from fallback event: ${JSON.stringify(fallbackEvent)}`);
+        }
+      } else {
+        throw new Error(`Could not find any relevant event in transaction result. Available events: ${JSON.stringify((result as any).events)}`);
+      }
+    }
+    
+    if (!potId) {
+      throw new Error("Could not extract pot_id from any event.");
+    }
+    
+    toast.loading("Registering pot with verifier...", { id: toastId });
+    
+    // Register with verifier service
+    await registerPot({ 
+      potId: potId.toString(), 
+      password, 
+      legend: colorMap, 
+      oneFaAddress: finalOneFaAddress 
+    });
+    
+    // Fetch the created pot from blockchain
+    const [potData] = await _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f.money_pot_manager.view.getPot(aptos, {
+      functionArguments: [BigInt(potId)]
+    });
+    
+    const newPot = transformToPot(potData);
+    addPot(newPot);
+    
+    // Refresh the pots list to get the latest pot IDs and ensure new pot appears at top
+    await fetchPots(true);
+    
+    // Update transaction as successful
+    updateTransaction(txId, { 
+      status: 'success', 
+      potId: potId.toString(),
+      description: `Successfully created Pot #${potId} with ${amount} USDC`
+    });
+    
+    toast.dismiss(toastId);
+    setCreationSuccess(true);
+    setTimeout(() => navigate("/pots"), 3000);
   };
   return (
     <div className="max-w-4xl mx-auto py-16 px-4 sm:px-6 lg:px-8">

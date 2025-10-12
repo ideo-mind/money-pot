@@ -1,5 +1,6 @@
 import { Link, Outlet } from "react-router-dom";
 import { UnifiedWalletConnectButton } from "./UnifiedWalletConnectButton";
+import { NetworkSelector } from "./NetworkSelector";
 import { BalanceDisplay } from "./BalanceDisplay";
 import { TransactionLog } from "./TransactionLog";
 import logoImage from "/logo.png";
@@ -22,6 +23,9 @@ export function Layout() {
               <Link to="/create" className="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition-colors">
                 Create a Pot
               </Link>
+              <Link to="/faucet" className="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition-colors">
+                Faucet
+              </Link>
               <Link to="/leaderboard" className="text-slate-600 dark:text-slate-300 hover:text-brand-green dark:hover:text-brand-green transition-colors">
                 Leaderboard
               </Link>
@@ -30,6 +34,7 @@ export function Layout() {
               </Link>
             </nav>
             <div className="flex items-center gap-4">
+              <NetworkSelector />
               <BalanceDisplay />
               <UnifiedWalletConnectButton />
             </div>
