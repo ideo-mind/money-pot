@@ -3,7 +3,8 @@ import injectedModule from '@web3-onboard/injected-wallets';
 import walletConnectModule from '@web3-onboard/walletconnect';
 import coinbaseModule from '@web3-onboard/coinbase';
 import metamaskModule from '@web3-onboard/metamask';
-import { EVM_CONFIG } from '@/config/viem';
+import { EVM_CONFIG, creditcoinTestnet } from '@/config/viem';
+import { toHex } from 'viem';
 
 // Initialize the injected wallets module
 const injected = injectedModule();
@@ -11,8 +12,8 @@ const injected = injectedModule();
 // Initialize WalletConnect module
 const walletConnect = walletConnectModule({
   projectId: EVM_CONFIG.WALLETCONNECT_PROJECT_ID,
-  requiredChains: [EVM_CONFIG.CHAIN_ID],
-  optionalChains: [EVM_CONFIG.CHAIN_ID],
+  requiredChains: [creditcoinTestnet.id].map(chainId => toHex(chainId)),
+  optionalChains: [creditcoinTestnet.id].map(chainId => toHex(chainId)),
 });
 
 // Initialize Coinbase module
@@ -26,11 +27,12 @@ export const onboard = Onboard({
   wallets: [injected, walletConnect, coinbase, metamask],
   chains: [
     {
-      id: `0x${EVM_CONFIG.CHAIN_ID.toString(16)}`, // Convert to hex
-      token: EVM_CONFIG.NATIVE_CURRENCY.symbol,
-      label: EVM_CONFIG.CHAIN_NAME,
-      rpcUrl: 'https://rpc.cc3-testnet.creditcoin.network',
-      blockExplorerUrl: EVM_CONFIG.EXPLORER_URL,
+      id: toHex(creditcoinTestnet.id), // Convert to hex
+      token: creditcoinTestnet.nativeCurrency.symbol,
+      label: creditcoinTestnet.name,
+      rpcUrl:creditcoinTestnet.rpcUrls.default.http[0],
+      blockExplorerUrl: creditcoinTestnet.blockExplorers.default.url,
+      secondaryTokens: [{ address: creditcoinTestnet.moneypot.token.address}],
     },
   ],
   accountCenter: {

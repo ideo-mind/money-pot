@@ -40,15 +40,47 @@ export function UnifiedWalletConnectButton() {
 
   // Check if wallet is on the correct network
   useEffect(() => {
-    if (walletState.type === 'aptos' && network) {
-      const isTestnet = network.name?.toLowerCase().includes('testnet') || 
-                       network.name?.toLowerCase().includes('test') ||
-                       network.chainId === '2'; // Aptos testnet chain ID
-      setIsWrongNetwork(!isTestnet);
-    } else if (walletState.type === 'evm') {
+    const checkNetwork = () => {
+      if (walletState.type === 'aptos' && network) {
+        const isTestnet = network.name?.toLowerCase().includes('testnet') || 
+                         network.name?.toLowerCase().includes('test') ||
+                         network.chainId === '2'; // Aptos testnet chain ID
+        setIsWrongNetwork(!isTestnet);
+      } else if (walletState.type === 'evm') {
+        const evmWallet = getConnectedWallet();
+        if (evmWallet?.provider) {
+          // Get current chain ID from the provider
+          evmWallet.provider.request({ method: 'eth_chainId' })
+            .then((chainId: string) => {
+              const isCorrectNetwork = chainId === '0x18e7f'; // Creditcoin testnet chain ID in hex (102031)
+              setIsWrongNetwork(!isCorrectNetwork);
+            })
+            .catch(() => {
+              // If we can't get the chain ID, assume wrong network
+              setIsWrongNetwork(true);
+            });
+        } else {
+          setIsWrongNetwork(true);
+        }
+      }
+    };
+
+    checkNetwork();
+
+    // Listen for chain changes in EVM wallets
+    if (walletState.type === 'evm') {
       const evmWallet = getConnectedWallet();
-      const isCorrectNetwork = evmWallet?.chains?.[0]?.id === '0x18e7f'; // Creditcoin testnet chain ID in hex
-      setIsWrongNetwork(!isCorrectNetwork);
+      if (evmWallet?.provider) {
+        const handleChainChanged = () => {
+          checkNetwork();
+        };
+
+        evmWallet.provider.on('chainChanged', handleChainChanged);
+        
+        return () => {
+          evmWallet.provider.removeListener('chainChanged', handleChainChanged);
+        };
+      }
     }
   }, [network, walletState.type]);
 
@@ -157,8 +189,22 @@ export function UnifiedWalletConnectButton() {
       } catch (error) {
         console.error("Failed to switch network:", error);
       }
+    } else if (walletState.type === 'evm') {
+      try {
+        // Import the switchNetwork function
+        const { switchNetwork } = await import('@/lib/web3onboard');
+        await switchNetwork(102031); // Creditcoin testnet chain ID
+      } catch (error) {
+        console.error("Failed to switch EVM network:", error);
+        // If switching fails, try adding the network first
+        try {
+          const { addNetwork } = await import('@/lib/web3onboard');
+          await addNetwork();
+        } catch (addError) {
+          console.error("Failed to add network:", addError);
+        }
+      }
     }
-    // For EVM, network switching is handled by Web3Onboard
   };
 
   const handleDisconnect = async () => {
