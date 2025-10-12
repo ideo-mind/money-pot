@@ -32,7 +32,7 @@ export const onboard = Onboard({
       label: creditcoinTestnet.name,
       rpcUrl:creditcoinTestnet.rpcUrls.default.http[0],
       blockExplorerUrl: creditcoinTestnet.blockExplorers.default.url,
-      secondaryTokens: [{ address: creditcoinTestnet.moneypot.token.address}],
+      secondaryTokens: [{ address: creditcoinTestnet.custom.moneypot.token.address}],
     },
   ],
   accountCenter: {
