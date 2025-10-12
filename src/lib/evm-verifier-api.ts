@@ -1,4 +1,4 @@
-import { encodeMessage } from 'viem';
+import { hashMessage, recoverMessageAddress } from 'viem';
 
 export interface EVMVerifierResponse {
   success: boolean;
@@ -135,15 +135,22 @@ class EVMVerifierServiceClient {
     });
   }
 
-  // Helper method to create signature for EVM messages (matching Python eth_account format)
+  // Helper method to create signature for EVM messages using Web3OnboardKit wallet
   static async createEVMSignature(
     wallet: any,
     message: string
   ): Promise<string> {
     try {
-      // Use viem's encodeMessage to match eth_account.messages.encode_defunct
-      const encodedMessage = encodeMessage({ raw: message });
-      const signature = await wallet.signMessage({ message: encodedMessage });
+      if (!wallet || !wallet.provider) {
+        throw new Error('No wallet provider available');
+      }
+
+      // Use Web3OnboardKit's wallet to sign the message
+      const signature = await wallet.provider.request({
+        method: 'personal_sign',
+        params: [message, wallet.accounts[0].address],
+      });
+
       return signature;
     } catch (error) {
       console.error('Failed to create EVM signature:', error);
@@ -164,4 +171,5 @@ class EVMVerifierServiceClient {
 }
 
 export const evmVerifierService = new EVMVerifierServiceClient();
+export { EVMVerifierServiceClient };
 export default EVMVerifierServiceClient;

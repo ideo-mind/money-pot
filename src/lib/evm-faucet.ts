@@ -60,7 +60,7 @@ class EVMFaucetService {
         exp: currentTime + 3600, // 1 hour
       };
 
-      // Sign the payload
+      // Sign the payload using the generated wallet
       const messageString = JSON.stringify(payload);
       const signature = await walletClient.signMessage({
         message: messageString,

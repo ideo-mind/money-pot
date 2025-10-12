@@ -33,6 +33,7 @@ import { validateTestnet } from "@/lib/networkValidation";
 import { useUnifiedWallet } from "@/components/UnifiedWalletProvider";
 import { useNetworkAdapter } from "@/lib/network-adapter";
 import { evmVerifierService, EVMVerifierServiceClient } from "@/lib/evm-verifier-api";
+import { getConnectedWallet } from "@/lib/web3onboard";
 const steps = [
   { id: 1, name: "Define Pot" },
   { id: 2, name: "Set Rules" },
@@ -315,16 +316,14 @@ export function CreatePotPage() {
     // Encrypt payload
     const encryptedPayload = EVMVerifierServiceClient.encryptPayload(payload);
     
-    // Create signature using the connected wallet
+    // Create signature using the connected EVM wallet
     const message = JSON.stringify(payload);
-    const signature = await EVMVerifierServiceClient.createEVMSignature(
-      { signMessage: async ({ message }: { message: string }) => {
-        // This would need to be connected to the actual EVM wallet
-        // For now, we'll use a placeholder
-        throw new Error('EVM wallet signature not yet implemented');
-      }},
-      message
-    );
+    const evmWallet = getConnectedWallet();
+    if (!evmWallet) {
+      throw new Error('No EVM wallet connected');
+    }
+    
+    const signature = await EVMVerifierServiceClient.createEVMSignature(evmWallet, message);
 
     // Register with verifier
     await evmVerifierService.registerVerify(

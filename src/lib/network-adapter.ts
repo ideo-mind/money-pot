@@ -4,6 +4,7 @@ import { usePotStore } from '@/store/pot-store';
 import { useEVMPotStore } from '@/store/evm-pot-store';
 import { evmContractService } from '@/lib/evm-api';
 import { evmVerifierService, EVMVerifierServiceClient } from '@/lib/evm-verifier-api';
+import { getConnectedWallet } from '@/lib/web3onboard';
 import { WalletType } from '@/lib/constants';
 
 export interface CreatePotParams {
@@ -80,15 +81,14 @@ class NetworkAdapter {
       // Encrypt payload
       const encryptedPayload = EVMVerifierServiceClient.encryptPayload(payload);
       
-      // Create signature
+      // Create signature using the connected EVM wallet
       const message = JSON.stringify(payload);
-      const signature = await EVMVerifierServiceClient.createEVMSignature(
-        { signMessage: async ({ message }: { message: string }) => {
-          // This would need to be connected to the actual wallet
-          throw new Error('Wallet signature not implemented in adapter');
-        }},
-        message
-      );
+      const evmWallet = getConnectedWallet();
+      if (!evmWallet) {
+        throw new Error('No EVM wallet connected');
+      }
+      
+      const signature = await EVMVerifierServiceClient.createEVMSignature(evmWallet, message);
 
       // Register with verifier
       await evmVerifierService.registerVerify(
@@ -218,15 +218,14 @@ class NetworkAdapter {
 
     try {
       if (this.walletType === 'evm') {
-        // Create signature for authentication
+        // Create signature for authentication using connected EVM wallet
         const message = attemptId.toString();
-        const signature = await EVMVerifierServiceClient.createEVMSignature(
-          { signMessage: async ({ message }: { message: string }) => {
-            // This would need to be connected to the actual wallet
-            throw new Error('Wallet signature not implemented in adapter');
-          }},
-          message
-        );
+        const evmWallet = getConnectedWallet();
+        if (!evmWallet) {
+          throw new Error('No EVM wallet connected');
+        }
+        
+        const signature = await EVMVerifierServiceClient.createEVMSignature(evmWallet, message);
 
         const challenges = await evmVerifierService.authenticateOptions(attemptId, signature);
         return { success: true, data: challenges };

@@ -12,6 +12,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { getAuthOptions, verifyAuth } from "@/lib/api";
 import { evmVerifierService, EVMVerifierServiceClient } from "@/lib/evm-verifier-api";
+import { getConnectedWallet } from "@/lib/web3onboard";
 import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from "@/abis";
 import type { money_pot_manager } from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
@@ -303,16 +304,14 @@ export function PotChallengePage() {
     console.log("Getting 1P challenges for EVM hunter:", hunterAddress);
     
     try {
-      // Create signature for authentication
+      // Create signature for authentication using connected EVM wallet
       const message = attemptId.toString();
-      const signature = await EVMVerifierServiceClient.createEVMSignature(
-        { signMessage: async ({ message }: { message: string }) => {
-          // This would need to be connected to the actual EVM wallet
-          // For now, we'll use a placeholder
-          throw new Error('EVM wallet signature not yet implemented');
-        }},
-        message
-      );
+      const evmWallet = getConnectedWallet();
+      if (!evmWallet) {
+        throw new Error('No EVM wallet connected');
+      }
+      
+      const signature = await EVMVerifierServiceClient.createEVMSignature(evmWallet, message);
 
       const authResponse = await evmVerifierService.authenticateOptions(attemptId, signature);
       console.log("Full EVM auth response:", authResponse);
