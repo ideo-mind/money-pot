@@ -48,7 +48,7 @@ export const creditcoinTestnet = defineChain({
 
 // Contract Configuration - From chain config
 export const MONEY_POT_CONTRACT_ADDRESS = creditcoinTestnet.custom.moneypot.address as `0x${string}`;
-export const USDC_TOKEN_ADDRESS = creditcoinTestnet.custom.token.address as `0x${string}`;
+export const USDC_TOKEN_ADDRESS = creditcoinTestnet.custom.moneypot.token.address as `0x${string}`;
 
 // WalletConnect Configuration - Hardcoded
 export const WALLETCONNECT_PROJECT_ID = import.meta.env.WALLETCONNECT_PROJECT_ID;
