@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 interface BaseErrorData {
   url: string;
   userAgent: string;
@@ -597,21 +599,13 @@ class ErrorReporter {
 
   private async sendError(error: ErrorReport) {
     try {
-      const response = await fetch(this.reportingEndpoint, {
-        method: "POST",
+      const response = await axios.post(this.reportingEndpoint, error, {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(error),
       });
 
-      if (!response.ok) {
-        throw new Error(
-          `Failed to report error: ${response.status} ${response.statusText}`
-        );
-      }
-
-      const result = (await response.json()) as {
+      const result = response.data as {
         success: boolean;
         error?: string;
       };
@@ -727,10 +721,8 @@ const shouldReportImmediate = (context: ErrorContext): boolean => {
 
 const sendImmediateError = async (payload: ImmediatePayload): Promise<void> => {
   try {
-    await fetch("/api/client-errors", {
-      method: "POST",
+    await axios.post("/api/client-errors", payload, {
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
     });
   } catch {
     // Fail silently
