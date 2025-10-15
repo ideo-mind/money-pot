@@ -60,9 +60,7 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
     console.log("Registering pot with verifier...", payload);
     
     // Step 1: Get registration options (colors and directions)
-    const optionsResponse = await axios.post(`${VERIFIER_BASE_URL}/register/options`, {}, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const optionsResponse = await axios.post(`${VERIFIER_BASE_URL}/register/options`, {});
     
     const optionsData = optionsResponse.data;
     console.log("Got registration options:", optionsData);
@@ -84,8 +82,6 @@ export const registerPot = async (payload: RegisterPayload): Promise<{ success: 
     const response = await axios.post(`${VERIFIER_BASE_URL}/register/verify`, {
       payload: payloadData, // Plain payload object for Aptos endpoint
       signature: 'mock_signature' // Simplified for MVP
-    }, {
-      headers: { 'Content-Type': 'application/json' }
     });
     
     const result = response.data;
@@ -120,8 +116,6 @@ export const getAuthOptions = async (attemptId: string, publicKey?: string): Pro
     const response = await axios.post(`${VERIFIER_BASE_URL}/authenticate/options`, {
       payload: { attempt_id: attemptId },
       public_key: hunterPublicKey
-    }, {
-      headers: { 'Content-Type': 'application/json' }
     });
     
     const result = response.data;
@@ -153,8 +147,6 @@ export const verifyAuth = async (challengeId: string, solutions: string[]): Prom
     const response = await axios.post(`${VERIFIER_BASE_URL}/authenticate/verify`, {
       solutions,
       challenge_id: challengeId
-    }, {
-      headers: { 'Content-Type': 'application/json' }
     });
     
     const result = response.data;

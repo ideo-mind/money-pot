@@ -599,11 +599,7 @@ class ErrorReporter {
 
   private async sendError(error: ErrorReport) {
     try {
-      const response = await axios.post(this.reportingEndpoint, error, {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await axios.post(this.reportingEndpoint, error);
 
       const result = response.data as {
         success: boolean;
@@ -721,9 +717,7 @@ const shouldReportImmediate = (context: ErrorContext): boolean => {
 
 const sendImmediateError = async (payload: ImmediatePayload): Promise<void> => {
   try {
-    await axios.post("/api/client-errors", payload, {
-      headers: { "Content-Type": "application/json" },
-    });
+    await axios.post("/api/client-errors", payload);
   } catch {
     // Fail silently
   }
