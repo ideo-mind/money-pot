@@ -19,19 +19,224 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 # Load environment variables
 load_dotenv()
 
-# Add the simulation script to path
-sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'aidocs'))
-
-# Import from simulation script
-from simul import (
-    AsyncRestClient, Account, create_pot, attempt_pot, attempt_completed,
-    get_transaction_events, extract_pot_id_from_events, extract_attempt_id_from_events
+# Aptos SDK imports
+from aptos_sdk.account import Account
+from aptos_sdk.async_client import RestClient as AsyncRestClient
+from aptos_sdk.bcs import Serializer
+from aptos_sdk.transactions import (
+    EntryFunction,
+    TransactionArgument,
+    TransactionPayload,
+    SignedTransaction,
 )
+from aptos_sdk.account_address import AccountAddress
 
 # Configuration
 MONEY_AUTH_URL = os.getenv("MONEY_AUTH_URL","https://auth.money-pot.unreal.art/")
 NODE_URL = os.getenv("RPC_URL", "https://fullnode.testnet.aptoslabs.com/v1")
 MODULE_ADDR = os.getenv("MONEY_POT_ADDRESS", "0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f")
+MODULE_QN = f"{MODULE_ADDR}::money_pot_manager"
+
+
+def load_main_account_from_env() -> Account:
+    """Load account from APTOS_PRIVATE_KEY environment variable"""
+    private_key = os.getenv("APTOS_PRIVATE_KEY")
+    if not private_key:
+        raise RuntimeError("APTOS_PRIVATE_KEY is not set")
+    return Account.load_key(private_key)
+
+
+def load_hunter_account_from_env() -> Account:
+    """Load hunter account from HUNTER_PRIVATE_KEY environment variable"""
+    private_key = os.getenv("HUNTER_PRIVATE_KEY")
+    if not private_key:
+        raise RuntimeError("HUNTER_PRIVATE_KEY is not set")
+    return Account.load_key(private_key)
+
+
+async def create_account(client: AsyncRestClient, creator: Account, new_account: Account) -> str:
+    """Create a new account"""
+    entry = EntryFunction.natural(
+        "0x1::aptos_account",
+        "create_account",
+        [],
+        [
+            TransactionArgument(new_account.account_address, lambda s, addr: addr.serialize(s)),
+        ],
+    )
+    
+    payload = TransactionPayload(entry)
+    return await submit_transaction(client, creator, payload)
+
+
+async def fund_account(client: AsyncRestClient, sender: Account, receiver: AccountAddress, amount: int) -> str:
+    """Fund an account with APT tokens"""
+    entry = EntryFunction.natural(
+        "0x1::aptos_account",
+        "transfer",
+        [],
+        [
+            TransactionArgument(receiver, lambda s, addr: addr.serialize(s)),
+            TransactionArgument(amount, Serializer.u64),
+        ],
+    )
+    
+    payload = TransactionPayload(entry)
+    return await submit_transaction(client, sender, payload)
+
+
+async def fund_fungible_asset(client: AsyncRestClient, sender: Account, receiver: AccountAddress, token_address: str, amount: int) -> str:
+    """Fund an account with fungible assets"""
+    from aptos_sdk.transactions import TypeTag, StructTag
+    
+    token_addr = AccountAddress.from_str(token_address)
+    
+    # Create the type argument for the fungible asset
+    type_arg = TypeTag(StructTag(
+        AccountAddress.from_str("0x1"),
+        "fungible_asset",
+        "FungibleAsset",
+        [TypeTag(StructTag(token_addr, "", "", []))]
+    ))
+    
+    entry = EntryFunction.natural(
+        "0x1::primary_fungible_store",
+        "transfer",
+        [type_arg],
+        [
+            TransactionArgument(receiver, lambda s, addr: addr.serialize(s)),
+            TransactionArgument(amount, Serializer.u64),
+        ],
+    )
+    
+    payload = TransactionPayload(entry)
+    return await submit_transaction(client, sender, payload)
+
+
+async def submit_transaction(client: AsyncRestClient, account: Account, payload: TransactionPayload) -> str:
+    """Submit a transaction and return the hash"""
+    # Create and sign the transaction using the SDK method
+    signed_txn = await client.create_bcs_signed_transaction(account, payload)
+    
+    # Submit and wait
+    result = await client.submit_and_wait_for_bcs_transaction(signed_txn)
+    return result["hash"]
+
+
+async def get_transaction_events(client: AsyncRestClient, tx_hash: str) -> list[Dict[str, Any]]:
+    """Get events from a transaction"""
+    tx = await client.transaction_by_hash(tx_hash)
+    return tx.get("events", [])
+
+
+def extract_pot_id_from_events(events: list[Dict[str, Any]]) -> Optional[int]:
+    """Extract pot_id from PotEvent with event_type 'created'"""
+    for event in events:
+        if event.get("type") == f"{MODULE_ADDR}::money_pot_manager::PotEvent":
+            data = event.get("data", {})
+            event_type_hex = data.get("event_type", "")
+            if event_type_hex:
+                try:
+                    event_type = bytes.fromhex(event_type_hex[2:]).decode()  # Remove '0x' prefix
+                    if event_type == "created":
+                        return int(data.get("id", 0))
+                except:
+                    continue
+    return None
+
+
+def extract_attempt_id_from_events(events: list[Dict[str, Any]]) -> Optional[int]:
+    """Extract attempt_id from PotEvent with event_type 'attempted'"""
+    for event in events:
+        if event.get("type") == f"{MODULE_ADDR}::money_pot_manager::PotEvent":
+            data = event.get("data", {})
+            event_type_hex = data.get("event_type", "")
+            if event_type_hex:
+                try:
+                    event_type = bytes.fromhex(event_type_hex[2:]).decode()  # Remove '0x' prefix
+                    if event_type == "attempted":
+                        return int(data.get("id", 0))
+                except:
+                    continue
+    return None
+
+
+async def view_function(client: AsyncRestClient, func_qn: str, args: list[bytes]) -> list:
+    return await client.view(func_qn, [], args)
+
+
+async def create_pot(
+    client: AsyncRestClient,
+    creator: Account,
+    amount: int,
+    duration_seconds: int,
+    fee: int,
+    one_fa_address: AccountAddress,
+) -> str:
+    """Create pot and return transaction hash"""
+    # Use TransactionArgument objects with correct encoders
+    entry = EntryFunction.natural(
+        MODULE_QN,
+        "create_pot_entry",
+        [],
+        [
+            TransactionArgument(amount, Serializer.u64),
+            TransactionArgument(duration_seconds, Serializer.u64),
+            TransactionArgument(fee, Serializer.u64),
+            TransactionArgument(one_fa_address, lambda s, addr: addr.serialize(s)),
+        ],
+    )
+    
+    payload = TransactionPayload(entry)
+    return await submit_transaction(client, creator, payload)
+
+
+async def attempt_pot(client: AsyncRestClient, hunter: Account, pot_id: int) -> str:
+    """Attempt pot and return transaction hash"""
+    entry = EntryFunction.natural(
+        MODULE_QN,
+        "attempt_pot_entry",
+        [],
+        [TransactionArgument(pot_id, Serializer.u64)],
+    )
+    
+    payload = TransactionPayload(entry)
+    return await submit_transaction(client, hunter, payload)
+
+
+async def attempt_completed(
+    client: AsyncRestClient, oracle: Account, attempt_id: int, status: bool
+) -> str:
+    """Mark attempt as completed and return transaction hash"""
+    entry = EntryFunction.natural(
+        MODULE_QN,
+        "attempt_completed",
+        [],
+        [
+            TransactionArgument(attempt_id, Serializer.u64),
+            TransactionArgument(status, Serializer.bool),
+        ],
+    )
+    
+    payload = TransactionPayload(entry)
+    return await submit_transaction(client, oracle, payload)
+
+
+async def get_active_pots(client: AsyncRestClient) -> list[int]:
+    res = await view_function(client, f"{MODULE_QN}::get_active_pots", [])
+    return [int(x) for x in res]
+
+
+async def get_pots(client: AsyncRestClient) -> list[int]:
+    res = await view_function(client, f"{MODULE_QN}::get_pots", [])
+    return [int(x) for x in res]
+
+
+async def get_attempt(client: AsyncRestClient, attempt_id: int) -> dict:
+    ser = Serializer()
+    ser.u64(attempt_id)
+    res = await view_function(client, f"{MODULE_QN}::get_attempt", [ser.output()])
+    return res  # SDK returns decoded fields; keep generic
 
 class VerifierServiceClient:
     """Client for interacting with the Money Pot Verifier Service"""
@@ -83,31 +288,30 @@ class VerifierServiceClient:
             return await response.json()
     
     async def register_options(self) -> Dict[str, Any]:
-        """Get encryption key for registration"""
-        async with self.session.post(f"{self.base_url}/register/options") as response:
+        """Get registration options"""
+        async with self.session.post(f"{self.base_url}/aptos/register/options") as response:
             return await response.json()
     
-    async def register_verify(self, encrypted_payload: str, public_key: str, signature: str) -> Dict[str, Any]:
+    async def register_verify(self, payload: Dict[str, Any], signature: str) -> Dict[str, Any]:
         """Register pot with 1P configuration"""
-        payload = {
-            "encrypted_payload": encrypted_payload,
-            "public_key": public_key,
+        request_payload = {
+            "payload": payload,
             "signature": signature
         }
         async with self.session.post(
-            f"{self.base_url}/register/verify",
-            json=payload
+            f"{self.base_url}/aptos/register/verify",
+            json=request_payload
         ) as response:
             return await response.json()
     
-    async def authenticate_options(self, attempt_id: str, public_key: str) -> Dict[str, Any]:
+    async def authenticate_options(self, attempt_id: str, signature: str) -> Dict[str, Any]:
         """Get authentication challenges"""
         payload = {
-            "payload": {"attempt_id": attempt_id},
-            "public_key": public_key
+            "payload": {"attempt_id": attempt_id, "signature": signature},
+            "public_key": signature  # The endpoint expects public_key field
         }
         async with self.session.post(
-            f"{self.base_url}/authenticate/options",
+            f"{self.base_url}/aptos/authenticate/options",
             json=payload
         ) as response:
             return await response.json()
@@ -119,7 +323,7 @@ class VerifierServiceClient:
             "challenge_id": challenge_id
         }
         async with self.session.post(
-            f"{self.base_url}/authenticate/verify",
+            f"{self.base_url}/aptos/authenticate/verify",
             json=payload
         ) as response:
             return await response.json()
@@ -145,11 +349,11 @@ class MoneyPotApp:
         self.client = AsyncRestClient(NODE_URL)
         
         # Load accounts from environment
-        self.creator_account = Account.load_key(os.getenv("APTOS_PRIVATE_KEY"))
-        self.hunter_account = Account.load_key(os.getenv("HUNTER_PRIVATE_KEY"))
+        self.creator_account = load_main_account_from_env()
+        self.hunter_account = load_hunter_account_from_env()
         
-        print(f"✅ Creator account: {self.creator_account.address()}")
-        print(f"✅ Hunter account: {self.hunter_account.address()}")
+        print(f"✅ Creator account: {self.creator_account.account_address}")
+        print(f"✅ Hunter account: {self.hunter_account.account_address}")
         
         # Initialize verifier service client
         self.verifier = VerifierServiceClient(MONEY_AUTH_URL)
@@ -165,16 +369,22 @@ class MoneyPotApp:
             self.directions = register_options.get('directions', {})
             print(f"✅ Colors: {self.colors}")
             print(f"✅ Directions: {self.directions}")
+
+            # Store color hex codes for UI rendering
+            self.color_hex_codes = self.colors  # The API now returns hex codes directly
             
             # Set default password and create legend mapping
             self.password = "A"  # Default password
             self.legend = {
                 "red": self.directions.get("up", "U"),
-                "green": self.directions.get("down", "D"), 
+                "green": self.directions.get("down", "D"),
                 "blue": self.directions.get("left", "L"),
                 "yellow": self.directions.get("right", "R")
             }
             print(f"✅ Legend: {self.legend}")
+
+            # Store direction mappings for later use
+            self.direction_mappings = self.directions
     
     async def create_pot_flow(self, amount: int = 10000, duration_seconds: int = 360, fee: int = 100):
         """Complete pot creation and registration flow"""
@@ -188,7 +398,7 @@ class MoneyPotApp:
             amount, 
             duration_seconds, 
             fee, 
-            self.hunter_account.address()  # Use hunter as 1FA address
+            self.hunter_account.account_address  # Use hunter as 1FA address
         )
         print(f"   Transaction: {create_tx_hash}")
         
@@ -202,36 +412,25 @@ class MoneyPotApp:
         # Step 2: Register pot with verifier service
         print("2. Registering pot with verifier service...")
         async with self.verifier as verifier:
-            # Get encryption key
+            # Get registration options
             register_options = await verifier.register_options()
-            print(f"   ✅ Got encryption key: {register_options['key_id']}")
+            print(f"   ✅ Got registration options")
             
-            # Create 1P configuration payload (minimize size for RSA encryption)
+            # Create 1P configuration payload
             current_time = int(asyncio.get_event_loop().time())
             payload = {
                 "pot_id": str(pot_id),
                 "1p": self.password,  # Dynamic password
                 "legend": self.legend,  # Dynamic legend from register options
                 "iat": current_time,
-                "iss": str(self.creator_account.address()),
+                "iss": str(self.creator_account.account_address),
                 "exp": current_time + 3600
             }
             
-            # For MVP: send plain text payload (no encryption)
-            payload_json = json.dumps(payload)
-            print(f"Payload: {payload_json}")
+            # Create signature for verification (simplified for MVP)
+            signature = "mock_signature"  # Simplified for MVP
             
-            # Send payload as hex string (no encryption for MVP)
-            encrypted_payload = payload_json.encode().hex()
-            
-            # Get creator's public key in hex format for signature verification
-            creator_public_key = self.creator_account.public_key().key.encode().hex()
-            
-            register_result = await verifier.register_verify(
-                encrypted_payload,
-                register_options["public_key"],  # Use RSA public key for key lookup
-                "mock_signature"  # Simplified for MVP
-            )
+            register_result = await verifier.register_verify(payload, signature)
             print(f"   ✅ Pot registered: {register_result}")
         
         return pot_id
@@ -255,27 +454,43 @@ class MoneyPotApp:
         # Step 2: Get authentication challenges
         print("2. Getting authentication challenges...")
         async with self.verifier as verifier:
-            # Use hunter's address as the public key since that's what was used in pot creation
-            hunter_address = str(self.hunter_account.address())
+            # Use hunter's address as the signature since that's what was used in pot creation
+            hunter_address = str(self.hunter_account.account_address)
             print(f"   Debug: Hunter address: {hunter_address}")
-            
-            # Use the address directly as the public key
-            hunter_public_key = hunter_address
-            auth_options = await verifier.authenticate_options(str(attempt_id), hunter_public_key)
+
+            # Use the address directly as the signature
+            hunter_signature = hunter_address
+            auth_options = await verifier.authenticate_options(str(attempt_id), hunter_signature)
             print(f"   ✅ Got {len(auth_options.get('challenges', []))} challenges")
+
+            # Update color and direction mappings from authenticate response if available
+            if 'colors' in auth_options:
+                self.colors = auth_options.get('colors')
+                print(f"   ✅ Updated colors from authenticate: {self.colors}")
+
+            if 'directions' in auth_options:
+                self.directions = auth_options.get('directions')
+                print(f"   ✅ Updated directions from authenticate: {self.directions}")
             
             # Step 3: Solve challenges based on strategy
             print("3. Solving challenges...")
-            DIRECTIONS = ["U", "D", "L", "R", "S"]  # Single letter format for 1P protocol
-            
+            # Use direction mappings from the API
+            DIRECTIONS = [
+                self.directions.get("up", "U"),
+                self.directions.get("down", "D"),
+                self.directions.get("left", "L"),
+                self.directions.get("right", "R"),
+                self.directions.get("skip", "S")
+            ]
+
             # Get strategy from environment variable
             strategy = os.getenv("STRATEGY", "intelligent").lower()
             print(f"   Strategy: {strategy}")
-            
+
             # Get the challenges and solve them based on strategy
             challenges = auth_options.get('challenges', [])
             solutions = []
-            
+
             if strategy == "random":
                 # Random strategy: generate random solutions
                 import random
@@ -283,9 +498,9 @@ class MoneyPotApp:
                 print(f"   Random solutions: {solutions}")
             else:
                 # Intelligent strategy: solve based on color groups and legend
-                # We know the password is "A" and the legend mapping
-                password = "A"
-                legend = {"red": "U", "green": "D", "blue": "L", "yellow": "R"}  # From our registration
+                # We know the password is "A" and use the legend from initialization
+                password = self.password
+                legend = self.legend  # Use the legend we created during initialization
                 
                 for i, challenge in enumerate(challenges):
                     print(f"   Challenge {i+1}: {challenge}")
