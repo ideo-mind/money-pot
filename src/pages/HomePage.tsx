@@ -5,6 +5,7 @@ import { usePotStore } from "@/store/pot-store";
 import { motion } from "framer-motion";
 import { ArrowRight, BrainCircuit, Lock } from "lucide-react";
 import { useEffect } from "react";
+import { DemoVideo } from "@/components/DemoVideo";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
 export function HomePage() {
   const pots = usePotStore((state) => state.sortedPots);
@@ -72,6 +73,16 @@ export function HomePage() {
               </Button>
             </motion.div>
           </motion.div>
+        </div>
+      </section>
+      {/* Demo Video Section */}
+      <section className="py-8 md:py-12 bg-white dark:bg-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl md:text-4xl font-display font-bold">See It in Action</h2>
+            <p className="mt-3 text-slate-600 dark:text-slate-300">Watch a quick demo of Money Pot.</p>
+          </div>
+          <DemoVideo />
         </div>
       </section>
       {/* How It Works Section */}
