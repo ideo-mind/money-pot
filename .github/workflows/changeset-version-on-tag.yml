@@ -1,0 +1,83 @@
+name: Changeset Version on Tag
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: changeset-version-on-tag
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Run Changesets version and push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag target is on main
+        id: check
+        shell: bash
+        run: |
+          echo "Pushed tag: ${GITHUB_REF_NAME}"
+          git fetch origin main
+          git fetch --tags --force
+          TAG_SHA=$(git rev-list -n 1 "${GITHUB_REF_NAME}" 2>/dev/null || true)
+          if [ -z "${TAG_SHA}" ]; then
+            TAG_SHA=$(git rev-list -n 1 "refs/tags/${GITHUB_REF_NAME}" 2>/dev/null || true)
+          fi
+          echo "Resolved tag commit: ${TAG_SHA}"
+          if [ -z "${TAG_SHA}" ]; then
+            echo "Could not resolve tag commit; skipping."
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git merge-base --is-ancestor "${TAG_SHA}" origin/main; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+            echo "Tag commit is on origin/main"
+          else
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+            echo "Tag commit is NOT on origin/main; skipping."
+          fi
+
+      - name: Switch to main branch
+        if: steps.check.outputs.on_main == 'true'
+        shell: bash
+        run: |
+          git fetch origin main
+          git checkout -B main origin/main
+
+      - name: Setup Bun
+        if: steps.check.outputs.on_main == 'true'
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Version packages with Changesets
+        if: steps.check.outputs.on_main == 'true'
+        run: bun run changeset version
+
+      - name: Install dependencies (update lockfiles)
+        if: steps.check.outputs.on_main == 'true'
+        run: bun install
+
+      - name: Commit and push version changes
+        if: steps.check.outputs.on_main == 'true'
+        shell: bash
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "chore(changeset): version packages for tag ${TAG_NAME}"
+          fi
+          git push origin HEAD:main
