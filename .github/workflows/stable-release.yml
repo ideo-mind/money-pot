@@ -1,0 +1,35 @@
+name: Stable Release (on tag push)
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'stable*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release from tag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Release ${{ github.ref_name }}"
+          body: |
+            Stable release for tag `${{ github.ref_name }}`.
+
+            Notes:
+            - Created automatically on tag push.
+            - Consider tagging the merge commit of the Changesets version PR.
+          prerelease: false
+          draft: false
+          generate_release_notes: true
