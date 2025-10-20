@@ -1,6 +1,9 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { usePotStore } from "@/store/pot-store";
+import { useEVMPotStore } from "@/store/evm-pot-store";
+import { useUnifiedWallet } from "@/components/UnifiedWalletProvider";
+import { useNetworkAdapter } from "@/lib/network-adapter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Loader2, PartyPopper, ShieldClose, SkipForward, CheckCircle2, XCircle, KeyRound, Zap, Target } from "lucide-react";
@@ -8,6 +11,8 @@ import { Toaster, toast } from "sonner";
 import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import { MODULE_ADDRESS, MODULE_NAME, aptos } from "@/lib/aptos";
 import { getAuthOptions, verifyAuth } from "@/lib/api";
+import { evmVerifierService, EVMVerifierServiceClient } from "@/lib/evm-verifier-api";
+import { getConnectedWallet } from "@/lib/web3onboard";
 import { _0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f } from "@/abis";
 import type { money_pot_manager } from "@/abis/0xea89ef9798a210009339ea6105c2008d8e154f8b5ae1807911c86320ea03ff3f";
 import { PotCardSkeleton } from "@/components/PotCardSkeleton";
@@ -24,12 +29,54 @@ export function PotChallengePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { connected, signAndSubmitTransaction, account, network } = useWallet();
-  const pot = usePotStore((state) => state.currentPot);
-  const loading = usePotStore((state) => state.loading);
-  const error = usePotStore((state) => state.error);
-  const fetchPotById = usePotStore((state) => state.fetchPotById);
-  const addAttempt = usePotStore((state) => state.addAttempt);
-  const expirePot = usePotStore((state) => state.expirePot);
+  const { walletState } = useUnifiedWallet();
+  const { adapter } = useNetworkAdapter();
+  
+  // Aptos store
+  const aptosPot = usePotStore((state) => state.currentPot);
+  const aptosLoading = usePotStore((state) => state.loading);
+  const aptosError = usePotStore((state) => state.error);
+  const aptosFetchPotById = usePotStore((state) => state.fetchPotById);
+  const aptosAddAttempt = usePotStore((state) => state.addAttempt);
+  const aptosExpirePot = usePotStore((state) => state.expirePot);
+  
+  // EVM store
+  const evmPot = useEVMPotStore((state) => state.currentPot);
+  const evmLoading = useEVMPotStore((state) => state.loading);
+  const evmError = useEVMPotStore((state) => state.error);
+  const evmFetchPotById = useEVMPotStore((state) => state.fetchPotById);
+  const evmAddAttempt = useEVMPotStore((state) => state.addAttempt);
+  const evmExpirePot = useEVMPotStore((state) => state.expirePot);
+  
+  // Get current network data based on wallet type
+  const getCurrentNetworkData = () => {
+    if (walletState?.type === 'evm') {
+      return {
+        pot: evmPot,
+        loading: evmLoading,
+        error: evmError,
+        fetchPotById: evmFetchPotById,
+        addAttempt: evmAddAttempt,
+        expirePot: evmExpirePot,
+        networkName: 'Creditcoin Testnet',
+        networkType: 'evm'
+      };
+    } else {
+      return {
+        pot: aptosPot,
+        loading: aptosLoading,
+        error: aptosError,
+        fetchPotById: aptosFetchPotById,
+        addAttempt: aptosAddAttempt,
+        expirePot: aptosExpirePot,
+        networkName: 'Aptos Testnet',
+        networkType: 'aptos'
+      };
+    }
+  };
+  
+  const currentData = getCurrentNetworkData();
+  const pot = currentData.pot;
   const { addTransaction, updateTransaction } = useTransactionStore();
   const [gameState, setGameState] = useState<GameState>("idle");
   const [oneFaPrivateKey, setOneFaPrivateKey] = useState("");
@@ -48,9 +95,9 @@ export function PotChallengePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   useEffect(() => {
     if (id) {
-      fetchPotById(id);
+      currentData.fetchPotById(id);
     }
-  }, [id, fetchPotById]);
+  }, [id, currentData.fetchPotById]);
 
   // Log solutions whenever they change
   useEffect(() => {
@@ -167,13 +214,28 @@ export function PotChallengePage() {
     setIsAutoCompleted(false); // Reset auto-completed flag when user manually changes key
   };
   const handleAttempt = async () => {
-    if (!connected || !pot) return;
+    if (!walletState?.type || !walletState?.address) {
+      toast.error("Please connect your wallet first.");
+      return;
+    }
     
-    // Validate network before proceeding
-    try {
-      validateTestnet(network);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Please switch to Aptos Testnet");
+    // Validate network based on wallet type
+    if (walletState.type === 'aptos') {
+      if (!connected || !account) {
+        toast.error("Please connect your Aptos wallet first.");
+        return;
+      }
+      
+      try {
+        validateTestnet(network);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Please switch to Aptos Testnet");
+        return;
+      }
+    }
+    
+    if (!pot) {
+      toast.error("Pot not found.");
       return;
     }
     
@@ -186,7 +248,7 @@ export function PotChallengePage() {
     // 1FA private key is now optional - allow attempts without it
     // if (keyState !== 'valid') return;
     setGameState("paying");
-    const toastId = toast.loading("Submitting entry fee transaction...");
+    const toastId = toast.loading(`Submitting entry fee transaction on ${currentData.networkName}...`);
     
     // Add transaction to log
     const txId = addTransaction({
@@ -199,94 +261,67 @@ export function PotChallengePage() {
     });
     
     try {
-      // Use wallet adapter to sign and submit transaction
-      const response = await signAndSubmitTransaction({
-        sender: account!.address,
-        data: {
-          function: `${MODULE_ADDRESS}::${MODULE_NAME}::attempt_pot_entry`,
-          typeArguments: [],
-          functionArguments: [BigInt(pot.id).toString()],
-        },
-      });
-      
-      // Update transaction with hash
-      updateTransaction(txId, { hash: response.hash });
-      
-      // Wait for transaction to complete
-      const result = await aptos.waitForTransaction({
-        transactionHash: response.hash,
-      });
-      
-      // Debug: Log all events to understand the structure
-      console.log("Transaction result:", result);
-      console.log("All events:", (result as any).events);
-      
-      let extractedAttemptId: string | undefined;
-      
-      // Extract attempt_id from events using proper PotEvent type
-      const attemptEvent = (result as any).events?.find((e: any) => {
-        console.log("Checking event:", e);
-        // Look for PotEvent with event_type containing "attempted"
-        if (e.type.includes("PotEvent")) {
-          const eventData = e.data as money_pot_manager.PotEvent;
-          console.log("PotEvent data:", eventData);
-          return eventData.event_type.includes("attempted");
-        }
-        return false;
-      });
-      
-      if (attemptEvent) {
-        const eventData = attemptEvent.data as money_pot_manager.PotEvent;
-        extractedAttemptId = eventData.id.toString();
-        console.log("Extracted attempt_id from PotEvent:", extractedAttemptId);
+      if (walletState.type === 'evm') {
+        await handleEVMAttemptPot(toastId, txId);
       } else {
-        // Fallback: try to find any event that might contain attempt information
-        console.log("No PotEvent found, trying fallback...");
-        const fallbackEvent = (result as any).events?.find((e: any) => 
-          e.type.includes("money_pot") || e.type.includes("attempt") || e.type.includes("attempted")
-        );
-        
-        if (fallbackEvent) {
-          console.log("Found fallback event:", fallbackEvent);
-          // Try to extract attempt_id from various possible locations
-          extractedAttemptId = fallbackEvent.data?.attempt_id?.toString() || 
-                              fallbackEvent.data?.id?.toString() || 
-                              fallbackEvent.data?.value?.toString();
-          if (extractedAttemptId) {
-            console.log("Extracted attempt_id from fallback:", extractedAttemptId);
-          } else {
-            throw new Error(`Could not extract attempt_id from fallback event: ${JSON.stringify(fallbackEvent)}`);
-          }
-        } else {
-          throw new Error(`Could not find any relevant event in transaction result. Available events: ${JSON.stringify((result as any).events)}`);
-        }
+        await handleAptosAttemptPot(toastId, txId);
+      }
+    } catch (error) {
+      // Update transaction as failed
+      updateTransaction(txId, { 
+        status: 'failed', 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      toast.error("Failed to pay entry fee.", { id: toastId, description: (error as Error).message });
+      setGameState("idle");
+    }
+  };
+
+  const handleEVMAttemptPot = async (toastId: string, txId: string) => {
+    // Attempt pot using network adapter
+    const result = await adapter.attemptPot({
+      potId: pot!.id,
+    });
+
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to attempt EVM pot');
+    }
+
+    const attemptId = result.data;
+    
+    // Update transaction with hash (we'll need to get this from the contract service)
+    updateTransaction(txId, { hash: attemptId }); // Using attemptId as hash for now
+    
+    // Store attempt_id for later use in verification
+    setAttemptId(attemptId);
+    
+    toast.success("Entry fee paid! Starting 1P authentication...", { id: toastId });
+    setGameState("fetching_challenge");
+    
+    // Step 2: Get 1P authentication challenges from EVM verifier service
+    const hunterAddress = walletState!.address!;
+    console.log("Getting 1P challenges for EVM hunter:", hunterAddress);
+    
+    try {
+      // Create signature for authentication using connected EVM wallet
+      const message = attemptId.toString();
+      const evmWallet = getConnectedWallet();
+      if (!evmWallet) {
+        throw new Error('No EVM wallet connected');
       }
       
-      if (!extractedAttemptId) {
-        throw new Error("Could not extract attempt_id from any event.");
-      }
+      const signature = await EVMVerifierServiceClient.createEVMSignature(evmWallet, message);
+
+      const authResponse = await evmVerifierService.authenticateOptions(attemptId, signature);
+      console.log("Full EVM auth response:", authResponse);
       
-      // Store attempt_id for later use in verification
-      setAttemptId(extractedAttemptId);
+      // Store dynamic colors and directions
+      setDynamicColors(authResponse.colors || {});
+      setDynamicDirections(authResponse.directions || {});
+      console.log("Dynamic colors:", authResponse.colors);
+      console.log("Dynamic directions:", authResponse.directions);
       
-      toast.success("Entry fee paid! Starting 1P authentication...", { id: toastId });
-      setGameState("fetching_challenge");
-      
-      // Step 2: Get 1P authentication challenges from verifier service
-      // Use the hunter's address as the public key (as per app.py reference)
-      const hunterAddress = account!.address;
-      console.log("Getting 1P challenges for hunter:", hunterAddress);
-      
-      try {
-        const authResponse = await getAuthOptions(extractedAttemptId.toString(), hunterAddress.toString());
-        console.log("Full auth response:", authResponse);
-        
-        // Store dynamic colors and directions
-        setDynamicColors(authResponse.colors || {});
-        setDynamicDirections(authResponse.directions || {});
-        console.log("Dynamic colors:", authResponse.colors);
-        console.log("Dynamic directions:", authResponse.directions);
-        
       const fetchedChallenges = authResponse.challenges || [];
       console.log("Received 1P challenges:", fetchedChallenges);
       console.log("Number of challenges:", fetchedChallenges.length);
@@ -298,42 +333,160 @@ export function PotChallengePage() {
         console.log("First challenge grid length:", fetchedChallenges[0].grid?.length || 'No grid');
         console.log("First challenge color groups:", fetchedChallenges[0].colorGroups);
       }
-        
-        // Check if we got valid challenges
-        if (fetchedChallenges.length === 0) {
-          throw new Error("No challenges received from verifier service");
-        }
-        
-        // Set challenges for human interaction
-        setChallenges(fetchedChallenges);
-        setCurrentRound(0);
-        setSolutions([]);
-        setGameState("playing");
-      } catch (authError) {
-        console.error("Failed to get 1P challenges:", authError);
-        toast.error("Failed to get 1P challenges from verifier service", { 
-          id: toastId, 
-          description: authError instanceof Error ? authError.message : 'Unknown error'
-        });
-        setGameState("idle");
-        return;
+      
+      // Check if we got valid challenges
+      if (fetchedChallenges.length === 0) {
+        throw new Error("No challenges received from EVM verifier service");
       }
       
-      // Update transaction as successful
-      updateTransaction(txId, { 
-        status: 'success',
-        description: `Successfully paid entry fee for Pot #${pot.id}`
+      // Set challenges for human interaction
+      setChallenges(fetchedChallenges);
+      setCurrentRound(0);
+      setSolutions([]);
+      setGameState("playing");
+    } catch (authError) {
+      console.error("Failed to get 1P challenges:", authError);
+      toast.error("Failed to get 1P challenges from EVM verifier service", { 
+        id: toastId, 
+        description: authError instanceof Error ? authError.message : 'Unknown error'
       });
-    } catch (error) {
-      // Update transaction as failed
-      updateTransaction(txId, { 
-        status: 'failed', 
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-      
-      toast.error("Failed to pay entry fee.", { id: toastId, description: (error as Error).message });
       setGameState("idle");
+      return;
     }
+    
+    // Update transaction as successful
+    updateTransaction(txId, { 
+      status: 'success',
+      description: `Successfully paid entry fee for Pot #${pot!.id}`
+    });
+  };
+
+  const handleAptosAttemptPot = async (toastId: string, txId: string) => {
+    // Use wallet adapter to sign and submit transaction
+    const response = await signAndSubmitTransaction({
+      sender: account!.address,
+      data: {
+        function: `${MODULE_ADDRESS}::${MODULE_NAME}::attempt_pot_entry`,
+        typeArguments: [],
+        functionArguments: [BigInt(pot!.id).toString()],
+      },
+    });
+    
+    // Update transaction with hash
+    updateTransaction(txId, { hash: response.hash });
+    
+    // Wait for transaction to complete
+    const result = await aptos.waitForTransaction({
+      transactionHash: response.hash,
+    });
+    
+    // Debug: Log all events to understand the structure
+    console.log("Transaction result:", result);
+    console.log("All events:", (result as any).events);
+    
+    let extractedAttemptId: string | undefined;
+    
+    // Extract attempt_id from events using proper PotEvent type
+    const attemptEvent = (result as any).events?.find((e: any) => {
+      console.log("Checking event:", e);
+      // Look for PotEvent with event_type containing "attempted"
+      if (e.type.includes("PotEvent")) {
+        const eventData = e.data as money_pot_manager.PotEvent;
+        console.log("PotEvent data:", eventData);
+        return eventData.event_type.includes("attempted");
+      }
+      return false;
+    });
+    
+    if (attemptEvent) {
+      const eventData = attemptEvent.data as money_pot_manager.PotEvent;
+      extractedAttemptId = eventData.id.toString();
+      console.log("Extracted attempt_id from PotEvent:", extractedAttemptId);
+    } else {
+      // Fallback: try to find any event that might contain attempt information
+      console.log("No PotEvent found, trying fallback...");
+      const fallbackEvent = (result as any).events?.find((e: any) => 
+        e.type.includes("money_pot") || e.type.includes("attempt") || e.type.includes("attempted")
+      );
+      
+      if (fallbackEvent) {
+        console.log("Found fallback event:", fallbackEvent);
+        // Try to extract attempt_id from various possible locations
+        extractedAttemptId = fallbackEvent.data?.attempt_id?.toString() || 
+                            fallbackEvent.data?.id?.toString() || 
+                            fallbackEvent.data?.value?.toString();
+        if (extractedAttemptId) {
+          console.log("Extracted attempt_id from fallback:", extractedAttemptId);
+        } else {
+          throw new Error(`Could not extract attempt_id from fallback event: ${JSON.stringify(fallbackEvent)}`);
+        }
+      } else {
+        throw new Error(`Could not find any relevant event in transaction result. Available events: ${JSON.stringify((result as any).events)}`);
+      }
+    }
+    
+    if (!extractedAttemptId) {
+      throw new Error("Could not extract attempt_id from any event.");
+    }
+    
+    // Store attempt_id for later use in verification
+    setAttemptId(extractedAttemptId);
+    
+    toast.success("Entry fee paid! Starting 1P authentication...", { id: toastId });
+    setGameState("fetching_challenge");
+    
+    // Step 2: Get 1P authentication challenges from verifier service
+    // Use the hunter's address as the public key (as per app.py reference)
+    const hunterAddress = account!.address;
+    console.log("Getting 1P challenges for hunter:", hunterAddress);
+    
+    try {
+      const authResponse = await getAuthOptions(extractedAttemptId.toString(), hunterAddress.toString());
+      console.log("Full auth response:", authResponse);
+      
+      // Store dynamic colors and directions
+      setDynamicColors(authResponse.colors || {});
+      setDynamicDirections(authResponse.directions || {});
+      console.log("Dynamic colors:", authResponse.colors);
+      console.log("Dynamic directions:", authResponse.directions);
+      
+      const fetchedChallenges = authResponse.challenges || [];
+      console.log("Received 1P challenges:", fetchedChallenges);
+      console.log("Number of challenges:", fetchedChallenges.length);
+      console.log("Pot difficulty:", pot?.difficulty);
+      console.log("Expected challenges based on difficulty:", pot?.difficulty);
+      
+      if (fetchedChallenges.length > 0) {
+        console.log("First challenge structure:", fetchedChallenges[0]);
+        console.log("First challenge grid length:", fetchedChallenges[0].grid?.length || 'No grid');
+        console.log("First challenge color groups:", fetchedChallenges[0].colorGroups);
+      }
+      
+      // Check if we got valid challenges
+      if (fetchedChallenges.length === 0) {
+        throw new Error("No challenges received from verifier service");
+      }
+      
+      // Set challenges for human interaction
+      setChallenges(fetchedChallenges);
+      setCurrentRound(0);
+      setSolutions([]);
+      setGameState("playing");
+    } catch (authError) {
+      console.error("Failed to get 1P challenges:", authError);
+      toast.error("Failed to get 1P challenges from verifier service", { 
+        id: toastId, 
+        description: authError instanceof Error ? authError.message : 'Unknown error'
+      });
+      setGameState("idle");
+      return;
+    }
+    
+    // Update transaction as successful
+    updateTransaction(txId, { 
+      status: 'success',
+      description: `Successfully paid entry fee for Pot #${pot!.id}`
+    });
   };
   const submitMove = async (move: string) => {
     console.log("Submitting move:", move);
@@ -383,13 +536,30 @@ export function PotChallengePage() {
           solutionsCount: updatedSolutions.length
         });
         
-        const verifyResponse = await verifyAuth(attemptId.toString(), updatedSolutions);
-        console.log("Response from /authenticate/verify:", verifyResponse);
+        let verifyResponse;
+        if (walletState?.type === 'evm') {
+          // Use EVM verifier service
+          const solutions = updatedSolutions.map((solution, index) => ({
+            challenge_id: index.toString(),
+            answer: solution
+          }));
+          
+          verifyResponse = await evmVerifierService.authenticateVerify(
+            solutions,
+            attemptId.toString(),
+            walletState.address!
+          );
+          console.log("Response from EVM /authenticate/verify:", verifyResponse);
+        } else {
+          // Use Aptos verifier service
+          verifyResponse = await verifyAuth(attemptId.toString(), updatedSolutions);
+          console.log("Response from Aptos /authenticate/verify:", verifyResponse);
+        }
         
         const { success } = verifyResponse;
         
         // Add attempt to local history (verifier service handles blockchain)
-        addAttempt({ potId: pot!.id, potTitle: pot!.title, status: success ? 'won' : 'lost', date: new Date().toISOString() });
+        currentData.addAttempt({ potId: pot!.id, potTitle: pot!.title, status: success ? 'won' : 'lost', date: new Date().toISOString() });
         
         if (success) {
           toast.success("🎉 Congratulations! You've solved the 1P challenge!", { id: toastId });
@@ -407,7 +577,7 @@ export function PotChallengePage() {
   };
 
   const handleExpirePot = async () => {
-    if (!pot || !connected || !account) {
+    if (!pot || !walletState?.type || !walletState?.address) {
       toast.error("Please connect your wallet first");
       return;
     }
@@ -424,26 +594,35 @@ export function PotChallengePage() {
     });
     
     try {
-      // Submit blockchain transaction
-      const response = await signAndSubmitTransaction({
-        sender: account.address,
-        data: {
-          function: `${MODULE_ADDRESS}::${MODULE_NAME}::expire_pot`,
-          typeArguments: [],
-          functionArguments: [BigInt(pot.id).toString()],
-        },
-      });
-      
-      // Update transaction with hash
-      updateTransaction(txId, { hash: response.hash });
-      
-      // Wait for transaction to complete
-      await aptos.waitForTransaction({
-        transactionHash: response.hash,
-      });
+      if (walletState.type === 'evm') {
+        // Use EVM expire pot
+        const success = await currentData.expirePot(pot.id);
+        if (!success) {
+          throw new Error('Failed to expire EVM pot');
+        }
+        updateTransaction(txId, { hash: pot.id }); // Using pot ID as hash for now
+      } else {
+        // Submit blockchain transaction for Aptos
+        const response = await signAndSubmitTransaction({
+          sender: account!.address,
+          data: {
+            function: `${MODULE_ADDRESS}::${MODULE_NAME}::expire_pot`,
+            typeArguments: [],
+            functionArguments: [BigInt(pot.id).toString()],
+          },
+        });
+        
+        // Update transaction with hash
+        updateTransaction(txId, { hash: response.hash });
+        
+        // Wait for transaction to complete
+        await aptos.waitForTransaction({
+          transactionHash: response.hash,
+        });
+      }
       
       // Update local state
-      const success = await expirePot(pot.id);
+      const success = await currentData.expirePot(pot.id);
       if (success) {
         // Update transaction as successful
         updateTransaction(txId, { 
@@ -453,7 +632,7 @@ export function PotChallengePage() {
         
         toast.success("Pot expired successfully!");
         // Refresh the pot data
-        await fetchPotById(pot.id);
+        await currentData.fetchPotById(pot.id);
       } else {
         // Update transaction as failed
         updateTransaction(txId, { 
@@ -486,14 +665,14 @@ export function PotChallengePage() {
       default: return <KeyRound className="h-4 w-4 text-muted-foreground" />;
     }
   }, [keyState]);
-  if (loading || (!pot && !error)) {
+  if (currentData.loading || (!pot && !currentData.error)) {
     return <div className="max-w-5xl mx-auto py-16 px-4 sm:px-6 lg:px-8"><PotCardSkeleton /></div>;
   }
-  if (error) {
+  if (currentData.error) {
     return (
       <div className="max-w-5xl mx-auto py-16 px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-2xl font-bold text-destructive">Error</h2>
-        <p className="text-muted-foreground mt-2">{error}</p>
+        <p className="text-muted-foreground mt-2">{currentData.error}</p>
         <Button onClick={() => navigate('/pots')} className="mt-4">Back to Pots</Button>
       </div>
     );
