@@ -1,0 +1,41 @@
+name: Prerelease (on PR merge)
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  prerelease:
+    name: Create prerelease on PR merge to main
+    runs-on: ubuntu-latest
+    if: >-
+      ${{ github.event.pull_request.merged == true &&
+          github.event.pull_request.base.ref == 'main' }}
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          name: "Prerelease: PR #${{ github.event.pull_request.number }} - ${{ github.event.pull_request.title }}"
+          body: |
+            This is an automated prerelease for PR #${{ github.event.pull_request.number }}.
+
+            • PR: ${{ github.event.pull_request.html_url }}
+            • Merge commit: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+
+            Notes:
+            - Generated automatically on PR merge to main.
+            - See Changesets for upcoming version bump details.
+          target_commitish: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          prerelease: true
+          draft: false
+          generate_release_notes: true
